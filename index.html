@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carte Interactive de l'Univers</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        /* La carte prend tout l'écran */
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, sans-serif; overflow: hidden; background: #000; }
+        #map { width: 100%; height: 100%; position: absolute; z-index: 1; }
+        
+        /* Curseur personnalisé sur la carte pour inciter au clic */
+        .leaflet-interactive { cursor: pointer !important; }
+
+        /* Le Panneau Latéral (Façon Google Maps) */
+        #info-panel { 
+            position: absolute; left: -400px; /* Caché hors de l'écran par défaut */
+            top: 0; bottom: 0; width: 400px; z-index: 10;
+            background: rgba(15, 15, 25, 0.85); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 30px; box-sizing: border-box; overflow-y: auto; color: white;
+            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.8);
+            transition: left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); /* Animation de glissement fluide */
+        }
+
+        /* Classe ajoutée en JS pour ouvrir le panneau */
+        #info-panel.ouvert { left: 0; }
+
+        /* Bouton pour fermer le panneau */
+        #btn-fermer {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(255,255,255,0.1); border: none; border-radius: 50%;
+            width: 35px; height: 35px; color: white; font-size: 1.2em; cursor: pointer;
+            display: flex; justify-content: center; align-items: center; transition: 0.2s;
+        }
+        #btn-fermer:hover { background: rgba(255, 60, 60, 0.6); }
+
+        /* Typographie de la fiche descriptive */
+        h1 { margin-top: 20px; margin-bottom: 5px; color: #00FFFF; font-size: 2em; text-shadow: 0 0 15px rgba(0,255,255,0.4); }
+        .type-badge { display: inline-block; background: rgba(255,255,255,0.15); padding: 5px 10px; border-radius: 15px; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; color: #ccc; margin-bottom: 20px; }
+        
+        .description { font-size: 1.05em; line-height: 1.6; color: rgba(255,255,255,0.9); margin-bottom: 30px; }
+
+        /* Grille des données scientifiques */
+        .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; }
+        .data-card { background: rgba(0,0,0,0.4); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05); }
+        .data-label { font-size: 0.75em; color: #888; text-transform: uppercase; margin-bottom: 5px; display: block; }
+        .data-value { font-size: 1.1em; font-weight: bold; color: #fff; }
+
+        /* Tags */
+        .tags-container { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tag { background: rgba(0, 255, 255, 0.1); color: #00FFFF; border: 1px solid rgba(0, 255, 255, 0.3); padding: 5px 12px; border-radius: 20px; font-size: 0.8em; }
+
+        /* Message d'accueil avant de cliquer */
+        #message-accueil {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 5;
+            background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 30px; color: white;
+            border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(5px); pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+    <div id="message-accueil">Naviguez et cliquez sur un astre pour l'explorer</div>
+
+    <div id="info-panel">
+        <button id="btn-fermer">✖</button>
+        
+        <h1 id="info-nom">Nom de l'Astre</h1>
+        <div class="type-badge" id="info-type">Type d'astre</div>
+        
+        <div class="description" id="info-description">Description détaillée ici...</div>
+
+        <div class="data-grid">
+            <div class="data-card">
+                <span class="data-label">Distance</span>
+                <span class="data-value" id="info-distance">-</span>
+            </div>
+            <div class="data-card">
+                <span class="data-label">Masse Stellaire</span>
+                <span class="data-value" id="info-masse">-</span>
+            </div>
+            <div class="data-card">
+                <span class="data-label">Masse Gaz</span>
+                <span class="data-value" id="info-gaz">-</span>
+            </div>
+            <div class="data-card">
+                <span class="data-label">Taux formation (SFR)</span>
+                <span class="data-value" id="info-sfr">-</span>
+            </div>
+        </div>
+
+        <div class="tags-container" id="info-tags">
+            </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="index.js"></script>
+</body>
+</html>
