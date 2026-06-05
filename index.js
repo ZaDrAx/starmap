@@ -1,81 +1,174 @@
-import { db, collection, getDocs } from './config.js';
+import { db, collection, getDocs, doc, getDoc } from './config.js';
 
-// --- 1. CONFIGURATION DE LA CARTE ---
-const map = L.map('map', {
-    crs: L.CRS.Simple,
-    minZoom: -2,
-    maxZoom: 3,
-    zoomControl: true 
+const map = L.map('map', { crs: L.CRS.Simple, minZoom: -2, maxZoom: 3, zoomControl: true });
+const bounds = [[0,0], [1000,1000]]; 
+let calqueImageFond = null;
+
+// --- MULTILINGUE ET ACCESSIBILITÉ ---
+let currentLang = 'fr';
+let currentFontSize = 16;
+const astresCharges = []; 
+let dernierAstreOvert = null; // Garde en mémoire l'astre ouvert pour le retraduire en direct
+
+// Dictionnaire pour l'interface statique
+const lexique = {
+    fr: { welcome: "Naviguez et cliquez sur un astre pour l'explorer", legend: "Filtres (Légende)", redshift: "Redshift ($z_{CO}$)", masse: "Masse ($M_{\\odot}$)", masseGaz: "Masse Gaz ($M_{\\odot}$)", sfr: "SFR", nonMesure: "Non mesuré", altPhoto: "Photo de l'astre" },
+    en: { welcome: "Navigate and click on a celestial body to explore it", legend: "Filters (Legend)", redshift: "Redshift ($z_{CO}$)", masse: "Stellar Mass ($M_{\\odot}$)", masseGaz: "Gas Mass ($M_{\\odot}$)", sfr: "SFR", nonMesure: "Not measured", altPhoto: "Photo of celestial body" },
+    es: { welcome: "Navegue y haga clic en un astro para explorarlo", legend: "Filtros (Leyenda)", redshift: "Corrimiento al rojo ($z_{CO}$)", masse: "Masa Estelar ($M_{\\odot}$)", masseGaz: "Masa de Gas ($M_{\\odot}$)", sfr: "SFR", nonMesure: "No medido", altPhoto: "Foto del astro" }
+};
+
+// Dictionnaire pour traduire les clés de types agnostiques enregistrées en admin
+const typesTraduction = {
+    smg: { fr: "SMG (Galaxie Submillimétrique)", en: "SMG (Submillimeter Galaxy)", es: "SMG (Galaxia Submilimétrica)" },
+    lrd: { fr: "LRD (Petit Point Rouge)", en: "LRD (Little Red Dot)", es: "LRD (Pequeño Punto Rojo)" },
+    candidate: { fr: "Candidate (Non confirmée)", en: "Candidate (Unconfirmed)", es: "Candidata (No confirmada)" },
+    quasar: { fr: "Quasar", en: "Quasar", es: "Quásar" },
+    spiral: { fr: "Galaxie Spirale", en: "Spiral Galaxy", es: "Galaxia Espiral" },
+    elliptical: { fr: "Galaxie Elliptique", en: "Elliptical Galaxy", es: "Galaxia Elíptica" },
+    unknown: { fr: "Inconnu", en: "Unknown", es: "Desconocido" }
+};
+
+// Écouteur de changement de langue
+document.getElementById('lang-selector').addEventListener('change', (e) => {
+    currentLang = e.target.value;
+    
+    // 1. Traduit les textes de l'interface principale
+    document.getElementById('message-accueil').innerText = lexique[currentLang].welcome;
+    document.getElementById('lbl-legend-title').innerText = lexique[currentLang].legend;
+    
+    // 2. Reconstruit la légende et rafraîchit les tooltips de la carte
+    construireLegende();
+    astresCharges.forEach(item => {
+        if(item.calque) item.calque.setTooltipContent(item.donnees.nom[currentLang] || item.donnees.nom.fr);
+    });
+
+    // 3. Si un panneau est ouvert, on le traduit instantanément à l'écran
+    if (dernierAstreOvert) ouvrirPanneau(dernierAstreOvert);
 });
 
-const bounds = [[0,0], [1000,1000]]; 
-L.imageOverlay('map-background.png', bounds).addTo(map);
-map.fitBounds(bounds);
+// Taille du texte
+document.getElementById('btn-text-plus').addEventListener('click', () => { currentFontSize = Math.min(currentFontSize + 2, 24); document.documentElement.style.setProperty('--base-font-size', currentFontSize + 'px'); });
+document.getElementById('btn-text-minus').addEventListener('click', () => { currentFontSize = Math.max(currentFontSize - 2, 12); document.documentElement.style.setProperty('--base-font-size', currentFontSize + 'px'); });
 
-// --- 2. GESTION DU PANNEAU LATÉRAL ---
+async function initialiserCartePublique() {
+    let mapImageUrl = 'map-background.png'; 
+    try {
+        const docSnap = await getDoc(doc(db, "parametres", "carte"));
+        if (docSnap.exists() && docSnap.data().url) mapImageUrl = docSnap.data().url;
+    } catch(e) {}
+    calqueImageFond = L.imageOverlay(mapImageUrl, bounds).addTo(map);
+    map.fitBounds(bounds); chargerCartePublique();
+}
+initialiserCartePublique();
+
 const panneau = document.getElementById('info-panel');
 const btnFermer = document.getElementById('btn-fermer');
 const messageAccueil = document.getElementById('message-accueil');
+btnFermer.addEventListener('click', () => { panneau.classList.remove('ouvert'); dernierAstreOvert = null; });
+map.on('click', () => { panneau.classList.remove('ouvert'); dernierAstreOvert = null; });
 
-// Fermer le panneau quand on clique sur la croix ou dans le vide sur la carte
-btnFermer.addEventListener('click', fermerPanneau);
-map.on('click', fermerPanneau);
+let currentSlide = 0; let photosActuelles = [];
+function afficherSlide(index) {
+    const slides = document.querySelectorAll('.carousel-slide'); const dots = document.querySelectorAll('.dot');
+    if(slides.length > 0) slides[currentSlide].classList.remove('active'); if(dots.length > 0) dots[currentSlide].classList.remove('active');
+    currentSlide = index;
+    if(slides.length > 0) slides[currentSlide].classList.add('active'); if(dots.length > 0) dots[currentSlide].classList.add('active');
+}
+document.getElementById('prev-btn').addEventListener('click', () => { let n = currentSlide - 1; if (n < 0) n = photosActuelles.length - 1; afficherSlide(n); });
+document.getElementById('next-btn').addEventListener('click', () => { let n = currentSlide + 1; if (n >= photosActuelles.length) n = 0; afficherSlide(n); });
 
-function fermerPanneau() {
-    panneau.classList.remove('ouvert');
+function construireCarrousel(photos, nomAstre) {
+    photosActuelles = photos || []; const container = document.getElementById('carousel-container'); const imagesDiv = document.getElementById('carousel-images'); const dotsDiv = document.getElementById('carousel-dots');
+    if (photosActuelles.length === 0) { container.style.display = 'none'; return; }
+    container.style.display = 'block'; imagesDiv.innerHTML = ''; dotsDiv.innerHTML = ''; currentSlide = 0;
+    photosActuelles.forEach((url, index) => {
+        const img = document.createElement('img'); img.src = url; img.className = `carousel-slide ${index === 0 ? 'active' : ''}`;
+        img.alt = `${lexique[currentLang].altPhoto} ${nomAstre} (${index + 1}/${photosActuelles.length})`;
+        imagesDiv.appendChild(img);
+        if (photosActuelles.length > 1) {
+            const dot = document.createElement('div'); dot.className = `dot ${index === 0 ? 'active' : ''}`; dot.addEventListener('click', () => afficherSlide(index)); dotsDiv.appendChild(dot);
+        }
+    });
+    document.getElementById('prev-btn').style.display = photosActuelles.length > 1 ? 'block' : 'none';
+    document.getElementById('next-btn').style.display = photosActuelles.length > 1 ? 'block' : 'none';
 }
 
 function ouvrirPanneau(donnees) {
-    // Remplissage des données textuelles
-    document.getElementById('info-nom').innerText = donnees.nom;
-    document.getElementById('info-type').innerText = donnees.typeAstre || "Astre inconnu";
-    document.getElementById('info-description').innerText = donnees.description;
+    dernierAstreOvert = donnees; // Mémorise l'objet pour les switchs de langue en direct
     
-    // Remplissage des données scientifiques (avec une valeur par défaut si vide)
-    document.getElementById('info-distance').innerHTML = donnees.distance ? `${donnees.distance} Md AL` : "<span style='color:#555'>Non mesuré</span>";
-    document.getElementById('info-masse').innerHTML = donnees.masse ? `${donnees.masse} M☉` : "<span style='color:#555'>Non mesuré</span>";
-    document.getElementById('info-gaz').innerHTML = donnees.masseGaz ? `${donnees.masseGaz} M☉` : "<span style='color:#555'>Non mesuré</span>";
-    document.getElementById('info-sfr').innerHTML = donnees.sfr ? donnees.sfr : "<span style='color:#555'>Non mesuré</span>";
+    // Extraction sécurisée des langues (fallback sur le français si vide)
+    const nomTraduit = donnees.nom[currentLang] || donnees.nom.fr;
+    const descTraduite = donnees.description[currentLang] || donnees.description.fr;
+    const cleType = donnees.typeAstre || "unknown";
+    const typeTraduit = typesTraduction[cleType] ? typesTraduction[cleType][currentLang] : typesTraduction.unknown[currentLang];
 
-    // Remplissage des tags
-    const conteneurTags = document.getElementById('info-tags');
-    conteneurTags.innerHTML = ''; // On vide les anciens tags
-    if (donnees.tags && donnees.tags.length > 0) {
-        donnees.tags.forEach(tag => {
-            const span = document.createElement('span');
-            span.className = 'tag';
-            span.innerText = tag;
-            conteneurTags.appendChild(span);
+    document.getElementById('info-nom').innerText = nomTraduit;
+    document.getElementById('info-type').innerText = typeTraduit;
+    document.getElementById('info-description').innerText = descTraduite;
+    
+    construireCarrousel(donnees.photos, nomTraduit);
+
+    const grid = document.getElementById('info-grid'); grid.innerHTML = ''; 
+    if (donnees.redshift) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].redshift}</span><span class="data-value">${donnees.redshift}</span></div>`;
+    if (donnees.masse) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].masse}</span><span class="data-value">${donnees.masse}</span></div>`;
+    if (donnees.masseGaz) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].masseGaz}</span><span class="data-value">${donnees.masseGaz}</span></div>`;
+    if (donnees.sfr) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].sfr}</span><span class="data-value">${donnees.sfr}</span></div>`;
+
+    // Injection des paramètres personnalisés traduits
+    if (donnees.parametresPersonnalises && donnees.parametresPersonnalises[currentLang]) {
+        Object.entries(donnees.parametresPersonnalises[currentLang]).forEach(([cle, valeur]) => {
+            if(valeur) grid.innerHTML += `<div class="data-card"><span class="data-label">${cle}</span><span class="data-value">${valeur}</span></div>`;
         });
     }
 
-    // On cache le message d'accueil et on ouvre le panneau
-    messageAccueil.style.opacity = '0';
-    panneau.classList.add('ouvert');
+    const conteneurTags = document.getElementById('info-tags'); conteneurTags.innerHTML = ''; 
+    const listTags = donnees.tags[currentLang] || donnees.tags.fr || [];
+    listTags.forEach(tag => { if(tag) { const span = document.createElement('span'); span.className = 'tag'; span.innerText = tag; conteneurTags.appendChild(span); } });
+
+    renderMathInElement(panneau, { delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false} ], throwOnError : false });
+    messageAccueil.style.opacity = '0'; panneau.classList.add('ouvert'); document.getElementById('info-nom').focus();
 }
 
+// --- LÉGENDE TRILINGUE DYNAMIQUE ---
+function construireLegende() {
+    const conteneurFiltres = document.getElementById('filter-container');
+    
+    // On mémorise l'état coché des filtres avant de vider pour ne pas perdre la sélection de l'utilisateur
+    const etats Coches = {};
+    document.querySelectorAll('#filter-container input').forEach(input => { etatsCoches[input.value] = input.checked; });
+    
+    conteneurFiltres.innerHTML = '';
+    const typesPresents = new Set(astresCharges.map(item => item.donnees.typeAstre || "unknown"));
 
-// --- 3. MATHÉMATIQUES DES FORMES (Identiques à l'admin pour le rendu visuel) ---
-function creerPointsReguliers(y, x, r, cotes) {
-    let pts = [];
-    for(let i=0; i<cotes; i++) {
-        let angle = (i * 360 / cotes - 90) * (Math.PI / 180);
-        pts.push([y + r * Math.sin(angle), x + r * Math.cos(angle)]);
-    }
-    return pts;
+    typesPresents.forEach(typeKey => {
+        const label = document.createElement('label'); label.className = 'filter-item';
+        const checkbox = document.createElement('input'); checkbox.type = 'checkbox';
+        checkbox.value = typeKey;
+        checkbox.checked = etatsCoches[typeKey] !== undefined ? etatsCoches[typeKey] : true;
+        
+        checkbox.addEventListener('change', appliquerFiltresLegende);
+        
+        const texteAffiche = typesTraduction[typeKey] ? typesTraduction[typeKey][currentLang] : typeKey;
+        label.appendChild(checkbox); label.appendChild(document.createTextNode(texteAffiche));
+        conteneurFiltres.appendChild(label);
+    });
+    appliquerFiltresLegende(); // Lance un rafraîchissement visuel immédiat des filtres
 }
 
-function creerEtoile(y, x, rExt, rInt, pointes) {
-    let pts = [];
-    let cotes = pointes * 2;
-    for(let i=0; i<cotes; i++) {
-        let r = (i % 2 === 0) ? rExt : rInt;
-        let angle = (i * 360 / cotes - 90) * (Math.PI / 180);
-        pts.push([y + r * Math.sin(angle), x + r * Math.cos(angle)]);
-    }
-    return pts;
+function appliquerFiltresLegende() {
+    const typesCoches = Array.from(document.querySelectorAll('#filter-container input:checked')).map(cb => cb.value);
+    astresCharges.forEach(item => {
+        const typeKey = item.donnees.typeAstre || "unknown";
+        if (typesCoches.includes(typeKey)) {
+            if (!map.hasLayer(item.calque)) map.addLayer(item.calque);
+        } else {
+            if (map.hasLayer(item.calque)) map.removeLayer(item.calque);
+        }
+    });
 }
 
+function creerPointsReguliers(y, x, r, c) { let pts = []; for(let i=0; i<c; i++) { let a = (i * 360 / c - 90) * (Math.PI / 180); pts.push([y + r * Math.sin(a), x + r * Math.cos(a)]); } return pts; }
+function creerEtoile(y, x, rE, rI, p) { let pts = []; for(let i=0; i<p*2; i++) { let r = (i % 2 === 0) ? rE : rI; let a = (i * 360 / (p*2) - 90) * (Math.PI / 180); pts.push([y + r * Math.sin(a), x + r * Math.cos(a)]); } return pts; }
 function genererCalqueForme(forme, coords, taille, style) {
     if (forme === 'cercle') return L.circle(coords, { radius: taille, ...style });
     if (forme === 'carre') return L.rectangle([[coords[0]-taille/2, coords[1]-taille/2], [coords[0]+taille/2, coords[1]+taille/2]], style);
@@ -86,41 +179,20 @@ function genererCalqueForme(forme, coords, taille, style) {
     return null;
 }
 
-
-// --- 4. CHARGEMENT DEPUIS FIREBASE ---
 async function chargerCartePublique() {
     try {
         const querySnapshot = await getDocs(collection(db, "galaxies"));
-        
         querySnapshot.forEach((documentFirebase) => {
-            const astre = documentFirebase.data();
-            const coords = JSON.parse(astre.coordonnees);
-            
-            // On génère la forme avec le style sauvegardé
+            const astre = documentFirebase.data(); let coords = []; try { coords = JSON.parse(astre.coordonnees); } catch(e) {}
             const calque = genererCalqueForme(astre.forme, coords, astre.taille, astre.style);
-            
             if (calque) {
                 calque.addTo(map);
-                
-                // On affiche juste le nom au survol de la souris
-                calque.bindTooltip(astre.nom, { direction: 'top', className: 'tooltip-perso' });
-
-                // L'événement le plus important : l'ouverture du panneau au clic !
-                calque.on('click', (evenement) => {
-                    L.DomEvent.stopPropagation(evenement); // Empêche le clic de traverser et fermer le panneau
-                    ouvrirPanneau(astre);
-                    
-                    // Optionnel : fait un léger zoom et centre la caméra sur l'astre cliqué
-                    let centre = astre.forme === 'polygone' ? calque.getBounds().getCenter() : L.latLng(coords[0], coords[1]);
-                    map.flyTo(centre, map.getZoom(), { duration: 0.5 });
-                });
+                calque.bindTooltip(astre.nom[currentLang] || astre.nom.fr, { direction: 'top', className: 'tooltip-perso' });
+                calque.on('tooltipopen', (e) => { renderMathInElement(e.tooltip._container, { delimiters: [{left: '$', right: '$', display: false}], throwOnError: false }); });
+                calque.on('click', (ev) => { L.DomEvent.stopPropagation(ev); ouvrirPanneau(astre); let centre = astre.forme === 'polygone' ? calque.getBounds().getCenter() : L.latLng(coords[0], coords[1]); map.flyTo(centre, map.getZoom(), { duration: 0.5 }); });
+                astresCharges.push({ calque: calque, donnees: astre });
             }
         });
-        
-    } catch (erreur) {
-        console.error("Erreur lors du chargement :", erreur);
-    }
+        construireLegende();
+    } catch (erreur) { console.error(erreur); }
 }
-
-// On lance le chargement
-chargerCartePublique();
