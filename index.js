@@ -8,7 +8,7 @@ let calqueImageFond = null;
 let currentLang = 'fr';
 let currentFontSize = 16;
 const astresCharges = []; 
-let dernierAstreOvert = null; // Garde en mémoire l'astre ouvert pour le retraduire en direct
+let dernierAstreOuvert = null; 
 
 // Dictionnaire pour l'interface statique
 const lexique = {
@@ -17,7 +17,7 @@ const lexique = {
     es: { welcome: "Navegue y haga clic en un astro para explorarlo", legend: "Filtros (Leyenda)", redshift: "Corrimiento al rojo ($z_{CO}$)", masse: "Masa Estelar ($M_{\\odot}$)", masseGaz: "Masa de Gas ($M_{\\odot}$)", sfr: "SFR", nonMesure: "No medido", altPhoto: "Foto del astro" }
 };
 
-// Dictionnaire pour traduire les clés de types agnostiques enregistrées en admin
+// Dictionnaire pour traduire les clés de types agnostiques
 const typesTraduction = {
     smg: { fr: "SMG (Galaxie Submillimétrique)", en: "SMG (Submillimeter Galaxy)", es: "SMG (Galaxia Submilimétrica)" },
     lrd: { fr: "LRD (Petit Point Rouge)", en: "LRD (Little Red Dot)", es: "LRD (Pequeño Punto Rojo)" },
@@ -32,18 +32,15 @@ const typesTraduction = {
 document.getElementById('lang-selector').addEventListener('change', (e) => {
     currentLang = e.target.value;
     
-    // 1. Traduit les textes de l'interface principale
     document.getElementById('message-accueil').innerText = lexique[currentLang].welcome;
     document.getElementById('lbl-legend-title').innerText = lexique[currentLang].legend;
     
-    // 2. Reconstruit la légende et rafraîchit les tooltips de la carte
     construireLegende();
     astresCharges.forEach(item => {
         if(item.calque) item.calque.setTooltipContent(item.donnees.nom[currentLang] || item.donnees.nom.fr);
     });
 
-    // 3. Si un panneau est ouvert, on le traduit instantanément à l'écran
-    if (dernierAstreOvert) ouvrirPanneau(dernierAstreOvert);
+    if (dernierAstreOuvert) ouvrirPanneau(dernierAstreOuvert);
 });
 
 // Taille du texte
@@ -64,8 +61,8 @@ initialiserCartePublique();
 const panneau = document.getElementById('info-panel');
 const btnFermer = document.getElementById('btn-fermer');
 const messageAccueil = document.getElementById('message-accueil');
-btnFermer.addEventListener('click', () => { panneau.classList.remove('ouvert'); dernierAstreOvert = null; });
-map.on('click', () => { panneau.classList.remove('ouvert'); dernierAstreOvert = null; });
+btnFermer.addEventListener('click', () => { panneau.classList.remove('ouvert'); dernierAstreOuvert = null; });
+map.on('click', () => { panneau.classList.remove('ouvert'); dernierAstreOuvert = null; });
 
 let currentSlide = 0; let photosActuelles = [];
 function afficherSlide(index) {
@@ -94,9 +91,8 @@ function construireCarrousel(photos, nomAstre) {
 }
 
 function ouvrirPanneau(donnees) {
-    dernierAstreOvert = donnees; // Mémorise l'objet pour les switchs de langue en direct
+    dernierAstreOuvert = donnees; 
     
-    // Extraction sécurisée des langues (fallback sur le français si vide)
     const nomTraduit = donnees.nom[currentLang] || donnees.nom.fr;
     const descTraduite = donnees.description[currentLang] || donnees.description.fr;
     const cleType = donnees.typeAstre || "unknown";
@@ -114,7 +110,6 @@ function ouvrirPanneau(donnees) {
     if (donnees.masseGaz) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].masseGaz}</span><span class="data-value">${donnees.masseGaz}</span></div>`;
     if (donnees.sfr) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].sfr}</span><span class="data-value">${donnees.sfr}</span></div>`;
 
-    // Injection des paramètres personnalisés traduits
     if (donnees.parametresPersonnalises && donnees.parametresPersonnalises[currentLang]) {
         Object.entries(donnees.parametresPersonnalises[currentLang]).forEach(([cle, valeur]) => {
             if(valeur) grid.innerHTML += `<div class="data-card"><span class="data-label">${cle}</span><span class="data-value">${valeur}</span></div>`;
@@ -126,15 +121,19 @@ function ouvrirPanneau(donnees) {
     listTags.forEach(tag => { if(tag) { const span = document.createElement('span'); span.className = 'tag'; span.innerText = tag; conteneurTags.appendChild(span); } });
 
     renderMathInElement(panneau, { delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false} ], throwOnError : false });
-    messageAccueil.style.opacity = '0'; panneau.classList.add('ouvert'); document.getElementById('info-nom').focus();
+    messageAccueil.style.opacity = '0'; panneau.classList.add('ouvert'); 
+    
+    // Focus corrigé pour l'accessibilité
+    const infoNom = document.getElementById('info-nom');
+    infoNom.setAttribute('tabindex', '-1');
+    infoNom.focus();
 }
 
-// --- LÉGENDE TRILINGUE DYNAMIQUE ---
+// --- CORRECTION: L'erreur était sur "etatsCoches" ici ! ---
 function construireLegende() {
     const conteneurFiltres = document.getElementById('filter-container');
     
-    // On mémorise l'état coché des filtres avant de vider pour ne pas perdre la sélection de l'utilisateur
-    const etats Coches = {};
+    const etatsCoches = {};
     document.querySelectorAll('#filter-container input').forEach(input => { etatsCoches[input.value] = input.checked; });
     
     conteneurFiltres.innerHTML = '';
@@ -152,7 +151,7 @@ function construireLegende() {
         label.appendChild(checkbox); label.appendChild(document.createTextNode(texteAffiche));
         conteneurFiltres.appendChild(label);
     });
-    appliquerFiltresLegende(); // Lance un rafraîchissement visuel immédiat des filtres
+    appliquerFiltresLegende(); 
 }
 
 function appliquerFiltresLegende() {
