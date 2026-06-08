@@ -1,8 +1,8 @@
 import { db, collection, addDoc, getDocs, doc, updateDoc, setDoc, getDoc } from './config.js';
 
 const map = L.map('map', { crs: L.CRS.Simple, minZoom: -2, zoomControl: false });
-const bounds = [[0,0], [1000,1000]]; 
 let calqueImageFond = null;
+let bounds = [[0,0], [1000,1000]]; // Valeur par défaut avant lecture
 
 async function chargerImageFond() {
     let mapImageUrl = 'map-background.png'; 
@@ -11,11 +11,25 @@ async function chargerImageFond() {
         if (docSnap.exists() && docSnap.data().url) {
             mapImageUrl = docSnap.data().url;
             document.getElementById('url-fond').value = mapImageUrl;
+        } else {
+            document.getElementById('url-fond').value = "";
         }
-    } catch(e) { console.error(e); }
-    if (calqueImageFond) map.removeLayer(calqueImageFond);
-    calqueImageFond = L.imageOverlay(mapImageUrl, bounds).addTo(map);
-    map.fitBounds(bounds);
+    } catch(e) { console.error("Erreur lecture fond :", e); }
+
+    // On charge l'image en mémoire pour lire ses VRAIES dimensions
+    const img = new Image();
+    img.onload = function() {
+        const w = img.naturalWidth || 1000;
+        const h = img.naturalHeight || 1000;
+        
+        // On adapte les limites mathématiques de la carte à l'image
+        bounds = [[0, 0], [h, w]];
+        
+        if (calqueImageFond) map.removeLayer(calqueImageFond);
+        calqueImageFond = L.imageOverlay(mapImageUrl, bounds).addTo(map);
+        map.fitBounds(bounds);
+    }
+    img.src = mapImageUrl;
 }
 chargerImageFond();
 

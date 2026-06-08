@@ -1,8 +1,8 @@
 import { db, collection, getDocs, doc, getDoc } from './config.js';
 
 const map = L.map('map', { crs: L.CRS.Simple, minZoom: -2, maxZoom: 3, zoomControl: true });
-const bounds = [[0,0], [1000,1000]]; 
 let calqueImageFond = null;
+let bounds = [[0,0], [1000,1000]]; // Valeur par défaut
 
 // --- MULTILINGUE ET ACCESSIBILITÉ ---
 let currentLang = 'fr';
@@ -17,7 +17,6 @@ const lexique = {
     es: { welcome: "Navegue y haga clic en un astro para explorarlo", legend: "Filtros (Leyenda)", redshift: "Corrimiento al rojo ($z_{CO}$)", masse: "Masa Estelar ($M_{\\odot}$)", masseGaz: "Masa de Gas ($M_{\\odot}$)", sfr: "SFR", nonMesure: "No medido", altPhoto: "Foto del astro" }
 };
 
-// Dictionnaire pour traduire les clés de types agnostiques
 const typesTraduction = {
     smg: { fr: "SMG (Galaxie Submillimétrique)", en: "SMG (Submillimeter Galaxy)", es: "SMG (Galaxia Submilimétrica)" },
     lrd: { fr: "LRD (Petit Point Rouge)", en: "LRD (Little Red Dot)", es: "LRD (Pequeño Punto Rojo)" },
@@ -28,25 +27,44 @@ const typesTraduction = {
     unknown: { fr: "Inconnu", en: "Unknown", es: "Desconocido" }
 };
 
-// Écouteur de changement de langue
 document.getElementById('lang-selector').addEventListener('change', (e) => {
     currentLang = e.target.value;
-    
     document.getElementById('message-accueil').innerText = lexique[currentLang].welcome;
     document.getElementById('lbl-legend-title').innerText = lexique[currentLang].legend;
-    
     construireLegende();
-    astresCharges.forEach(item => {
-        if(item.calque) item.calque.setTooltipContent(item.donnees.nom[currentLang] || item.donnees.nom.fr);
-    });
-
+    astresCharges.forEach(item => { if(item.calque) item.calque.setTooltipContent(item.donnees.nom[currentLang] || item.donnees.nom.fr); });
     if (dernierAstreOuvert) ouvrirPanneau(dernierAstreOuvert);
 });
 
-// Taille du texte
 document.getElementById('btn-text-plus').addEventListener('click', () => { currentFontSize = Math.min(currentFontSize + 2, 24); document.documentElement.style.setProperty('--base-font-size', currentFontSize + 'px'); });
 document.getElementById('btn-text-minus').addEventListener('click', () => { currentFontSize = Math.max(currentFontSize - 2, 12); document.documentElement.style.setProperty('--base-font-size', currentFontSize + 'px'); });
 
+
+async function initialiserCartePublique() {
+    let mapImageUrl = 'map-background.png'; 
+    try {
+        const docSnap = await getDoc(doc(db, "parametres", "carte"));
+        if (docSnap.exists() && docSnap.data().url) mapImageUrl = docSnap.data().url;
+    } catch(e) { console.error("Erreur lecture fond :", e); }
+
+    // On charge l'image en mémoire pour lire ses VRAIES dimensions
+    const img = new Image();
+    img.onload = function() {
+        const w = img.naturalWidth || 1000;
+        const h = img.naturalHeight || 1000;
+        bounds = [[0, 0], [h, w]];
+        
+        calqueImageFond = L.imageOverlay(mapImageUrl, bounds).addTo(map);
+        map.fitBounds(bounds);
+        
+        // On ne lance le chargement des galaxies qu'une fois la grille bien calibrée !
+        chargerCartePublique();
+    }
+    img.src = mapImageUrl;
+}
+initialiserCartePublique();
+
+// ... LE RESTE DU CODE INDEX.JS NE CHANGE PAS (const panneau = document.getElementById('info-panel');...)
 async function initialiserCartePublique() {
     let mapImageUrl = 'map-background.png'; 
     try {
