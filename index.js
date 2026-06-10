@@ -62,19 +62,6 @@ async function initialiserCartePublique() {
     }
     img.src = mapImageUrl;
 }
-initialiserCartePublique();
-
-// ... LE RESTE DU CODE INDEX.JS NE CHANGE PAS (const panneau = document.getElementById('info-panel');...)
-async function initialiserCartePublique() {
-    let mapImageUrl = 'map-background.png'; 
-    try {
-        const docSnap = await getDoc(doc(db, "parametres", "carte"));
-        if (docSnap.exists() && docSnap.data().url) mapImageUrl = docSnap.data().url;
-    } catch(e) {}
-    calqueImageFond = L.imageOverlay(mapImageUrl, bounds).addTo(map);
-    map.fitBounds(bounds); chargerCartePublique();
-}
-initialiserCartePublique();
 
 const panneau = document.getElementById('info-panel');
 const btnFermer = document.getElementById('btn-fermer');
