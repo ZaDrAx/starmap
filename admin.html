@@ -12,27 +12,23 @@
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; overflow: hidden; background: #000; }
         #map { width: 100%; height: 100%; position: absolute; z-index: 1; }
+        .leaflet-container { background: #000 !important; }
         
         #admin-panel { position: absolute; right: 20px; top: 20px; bottom: 20px; width: 450px; z-index: 10; background: rgba(20, 20, 30, 0.75); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 20px; padding: 20px; box-sizing: border-box; overflow-y: auto; color: white; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; gap: 15px; }
         #admin-panel::-webkit-scrollbar { width: 8px; } #admin-panel::-webkit-scrollbar-thumb { background: rgba(0, 255, 255, 0.5); border-radius: 4px; }
         
-        /* ONGLES PRINCIPAUX */
         .onglets-container { display: flex; gap: 5px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px; }
         .onglet-btn { flex: 1; padding: 8px 5px; background: transparent; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: rgba(255,255,255,0.6); font-weight: bold; cursor: pointer; transition: 0.3s; font-size: 0.9em; }
         .onglet-btn:hover { background: rgba(255,255,255,0.1); color: white; }
         .onglet-btn.active { background: rgba(0, 255, 255, 0.2); border-color: #00FFFF; color: #00FFFF; }
         
-        /* NOUVEAU : ONGLETS DE LANGUE DANS LE FORMULAIRE */
         .form-lang-container { display: flex; gap: 5px; background: rgba(0,0,0,0.3); padding: 3px; border-radius: 8px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.1); }
         .form-lang-btn { flex: 1; border: none; background: transparent; color: rgba(255,255,255,0.5); padding: 6px; cursor: pointer; border-radius: 6px; font-weight: bold; font-size: 0.85em; transition: 0.2s; }
         .form-lang-btn.active { background: rgba(255,255,255,0.15); color: white; }
-        
-        /* Gestion de l'affichage des langues */
-        .lang-section { display: none; }
-        .lang-section.active { display: flex; flex-direction: column; gap: 10px; }
+        .lang-section { display: none; } .lang-section.active { display: flex; flex-direction: column; gap: 10px; }
 
         h2, h3 { margin: 0; text-align: center; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.5); }
-        label { font-size: 0.85em; color: rgba(255,255,255,0.8); display: flex; justify-content: space-between; align-items: center; }
+        label { font-size: 0.85em; color: rgba(255,255,255,0.8); display: flex; justify-content: space-between; align-items: center; margin-top: 5px; }
         input[type="text"], input[type="number"], textarea, select { width: 100%; padding: 8px; box-sizing: border-box; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: white; outline: none; margin-top: 3px; }
         select option { background: #1a1a1a; }
         .flex-row { display: flex; gap: 15px; align-items: flex-end; } .flex-col { flex: 1; display: flex; flex-direction: column; }
@@ -76,6 +72,10 @@
         
         .btn-supprimer-champ { background: transparent; border: none; color: #ff4d4d; font-size: 1.2em; cursor: pointer; padding: 0 5px; }
         .latex-helper { padding: 2px; font-size: 0.8em; background: rgba(255,255,255,0.1); width: auto; color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; }
+
+        .leaflet-control-layers { background: rgba(15, 15, 25, 0.85) !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; color: white !important; backdrop-filter: blur(10px); border-radius: 10px !important; }
+        .leaflet-control-layers-expanded { padding: 10px 15px !important; }
+        .leaflet-control-layers-separator { border-top: 1px solid rgba(255,255,255,0.2) !important; margin: 8px 0 !important; }
     </style>
 </head>
 <body>
@@ -85,7 +85,7 @@
         <div class="onglets-container">
             <button class="onglet-btn active" data-cible="vue-editeur">✍️ Éditeur</button>
             <button class="onglet-btn" data-cible="vue-bibliotheque">📚 Bibliothèque</button>
-            <button class="onglet-btn" data-cible="vue-parametres">⚙️ Carte</button>
+            <button class="onglet-btn" data-cible="vue-parametres">⚙️ Carte & Calques</button>
         </div>
 
         <div id="vue-editeur">
@@ -126,7 +126,6 @@
             <details>
                 <summary>Médias (Photos)</summary>
                 <div class="details-content">
-                    <p style="font-size:0.8em; color:rgba(255,255,255,0.6); margin:0;">Ajoutez les liens URLs de vos images PNG/JPG. (Global pour les 3 langues).</p>
                     <div id="conteneur-photos"></div>
                     <button type="button" class="btn-outil" id="btn-ajouter-photo" style="border: 1px dashed rgba(0,255,255,0.5); color: #00FFFF; background: rgba(0,255,255,0.1);">+ Ajouter une photo (URL)</button>
                 </div>
@@ -137,7 +136,7 @@
                 <div class="details-content">
                     <div class="flex-row">
                         <div class="flex-col">
-                            <label>Type d'astre (Agnostique) :</label>
+                            <label>Type d'astre :</label>
                             <select id="type-astre">
                                 <option value="smg">SMG (Submillimeter Galaxy)</option>
                                 <option value="lrd">LRD (Little Red Dot)</option>
@@ -145,22 +144,18 @@
                                 <option value="quasar">Quasar</option>
                                 <option value="spiral">Spiral Galaxy</option>
                                 <option value="elliptical">Elliptical Galaxy</option>
-                                <option value="unknown">Unknown</option>
+                                <option value="unknown">Unknown / Area Contour</option>
                             </select>
                         </div>
-                        <div class="flex-col">
-                            <label>Redshift ($z$ ou $z_{CO}$) :</label>
-                            <input type="text" id="redshift" placeholder="ex: 6.5">
-                        </div>
+                        <div class="flex-col"><label>Redshift ($z$ ou $z_{CO}$) :</label><input type="text" id="redshift"></div>
                     </div>
                     <div class="flex-row">
-                        <div class="flex-col"><label>Masse ($M_{\odot}$) :</label><input type="text" id="masse" placeholder="ex: 10^{11}"></div>
-                        <div class="flex-col"><label>Masse Gaz ($M_{\odot}$) :</label><input type="text" id="masse-gaz" placeholder="ex: 10^9"></div>
+                        <div class="flex-col"><label>Masse ($M_{\odot}$) :</label><input type="text" id="masse"></div>
+                        <div class="flex-col"><label>Masse Gaz ($M_{\odot}$) :</label><input type="text" id="masse-gaz"></div>
                     </div>
                     <div class="flex-row">
-                        <div class="flex-col"><label>Taux de formation (SFR) :</label><input type="text" id="sfr" placeholder="ex: 50"></div>
+                        <div class="flex-col"><label>Taux de formation (SFR) :</label><input type="text" id="sfr"></div>
                     </div>
-
                     <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); width: 100%; margin: 10px 0;">
                     <div id="conteneur-champs-perso"></div>
                     <button type="button" class="btn-outil" id="btn-ajouter-champ" style="margin-top: 5px; border: 1px dashed rgba(0,255,255,0.5); color: #00FFFF; background: rgba(0,255,255,0.1);">+ Ajouter paramètre personnalisé trilingue</button>
@@ -168,9 +163,16 @@
             </details>
 
             <details>
-                <summary>Apparence sur la carte</summary>
+                <summary>Apparence & Calque d'assignation</summary>
                 <div class="details-content">
-                    <label>Forme :</label>
+                    <div>
+                        <label>Assigner la forme à ce calque :</label>
+                        <select id="calque-assigne" style="border: 1px solid #00FFFF; box-shadow: 0 0 5px rgba(0,255,255,0.3);">
+                            <option value="principal">Carte principale (Permanent)</option>
+                        </select>
+                    </div>
+
+                    <label style="margin-top: 10px;">Forme :</label>
                     <div class="btn-group" id="group-forme">
                         <button type="button" class="btn-option active" data-value="cercle">⏺️</button>
                         <button type="button" class="btn-option" data-value="carre">⏹️</button>
@@ -203,7 +205,7 @@
                 </div>
             </details>
 
-            <button type="button" class="btn-submit" id="btn-sauvegarder">Enregistrer l'Astre</button>
+            <button type="button" class="btn-submit" id="btn-sauvegarder">Enregistrer l'Astre / la Zone</button>
         </div>
 
         <div id="vue-bibliotheque" style="display: none;">
@@ -225,11 +227,20 @@
         </div>
 
         <div id="vue-parametres" style="display: none;">
-            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center;">
-                <h3>Lien de l'image de fond</h3>
-                <input type="text" id="url-fond" placeholder="https://mon-site.com/carte.jpg" style="text-align: center; font-size: 1.05em; padding: 12px; margin-bottom: 15px;">
-                <button type="button" class="btn-submit" id="btn-maj-carte" style="background: #17a2b8; border-color: #17a2b8;">Appliquer la nouvelle carte</button>
-                <div id="upload-status" style="margin-top: 10px; font-weight: bold; font-size: 0.9em;"></div>
+            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+                <h3 style="margin-bottom: 5px;">Gestionnaire Globale des Calques</h3>
+                <p style="font-size: 0.83em; color: #ccc; text-align: center; line-height:1.4;">
+                    Le 1er calque est l'image de fond.<br>
+                    • Mettre un lien URL = <b>Calque d'image fixe Overlay</b>.<br>
+                    • Laisser l'URL vide = <b>Calque Vectoriel (Conteneur de formes dessinées cliquables)</b>.
+                </p>
+                
+                <div id="conteneur-images-calques"></div>
+                
+                <button type="button" class="btn-outil" id="btn-ajouter-image-calque" style="border: 1px dashed rgba(0,255,255,0.5); color: #00FFFF; background: rgba(0,255,255,0.1); width: 100%; margin-top: 10px;">+ Ajouter un nouveau calque vide</button>
+                <button type="button" class="btn-submit" id="btn-maj-carte" style="background: #17a2b8; border-color: #17a2b8;">Sauvegarder et Synchroniser les calques</button>
+                
+                <div id="upload-status" style="margin-top: 10px; font-weight: bold; font-size: 0.9em; text-align: center;"></div>
             </div>
         </div>
     </div>
