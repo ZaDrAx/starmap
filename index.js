@@ -40,15 +40,10 @@ async function initialiserCartePublique() {
         const docSnap = await getDoc(doc(db, "parametres", "carte"));
         if (docSnap.exists()) {
             const data = docSnap.data();
-            if (data.calques && data.calques.length > 0) {
-                calquesDB = data.calques;
-            } else if (data.url) {
-                calquesDB = [{ nom: "Carte de base", url: data.url }];
-            }
+            if (data.calques && data.calques.length > 0) calquesDB = data.calques;
+            else if (data.url) calquesDB = [{ nom: "Carte de base", url: data.url }];
         }
-    } catch(erreur) { 
-        console.error("Erreur Firebase (Paramètres Carte) :", erreur); 
-    }
+    } catch(erreur) { console.error("Erreur Firebase :", erreur); }
 
     function finaliserChargement(h, w) {
         bounds = [[0, 0], [h, w]];
@@ -67,22 +62,14 @@ async function initialiserCartePublique() {
         });
 
         if (Object.keys(overlays).length > 0) L.control.layers({}, overlays, { position: 'topright' }).addTo(map);
-        map.fitBounds(bounds);
-        chargerCartePublique(); 
+        map.fitBounds(bounds); chargerCartePublique(); 
     }
 
-    if (!calquesDB[0].url) {
-        finaliserChargement(1000, 1000);
-    } else {
+    if (!calquesDB[0].url) { finaliserChargement(1000, 1000); } 
+    else {
         const img = new Image();
-        img.onerror = function() {
-            // Pas de message envahissant pour le public, mais ça charge quand même !
-            console.warn("L'image de fond n'a pas pu être chargée.");
-            finaliserChargement(1000, 1000);
-        };
-        img.onload = function() {
-            finaliserChargement(img.naturalHeight || 1000, img.naturalWidth || 1000);
-        }
+        img.onerror = function() { finaliserChargement(1000, 1000); };
+        img.onload = function() { finaliserChargement(img.naturalHeight || 1000, img.naturalWidth || 1000); }
         img.src = calquesDB[0].url;
     }
 }
@@ -92,6 +79,22 @@ initialiserCartePublique();
 const panneau = document.getElementById('info-panel'); const btnFermer = document.getElementById('btn-fermer'); const messageAccueil = document.getElementById('message-accueil');
 btnFermer.addEventListener('click', () => { panneau.classList.remove('ouvert'); dernierAstreOuvert = null; });
 map.on('click', () => { panneau.classList.remove('ouvert'); dernierAstreOuvert = null; });
+
+// --- NOUVEAU : GESTION DE LA LIGHTBOX (AGRANDISSEMENT D'IMAGE) ---
+const lightboxModal = document.getElementById('lightbox-modal');
+const lightboxImg = document.getElementById('lightbox-img');
+const lightboxFermer = document.getElementById('lightbox-fermer');
+
+function fermerLightbox() {
+    lightboxModal.classList.remove('ouvert');
+    lightboxModal.setAttribute('aria-hidden', 'true');
+}
+
+lightboxFermer.addEventListener('click', fermerLightbox);
+lightboxModal.addEventListener('click', (e) => {
+    // Ferme la lightbox si on clique dans le vide (autour de l'image)
+    if (e.target === lightboxModal) fermerLightbox(); 
+});
 
 let currentSlide = 0; let photosActuelles = [];
 function afficherSlide(index) {
@@ -107,10 +110,27 @@ function construireCarrousel(photos, nomAstre) {
     photosActuelles = photos || []; const container = document.getElementById('carousel-container'); const imagesDiv = document.getElementById('carousel-images'); const dotsDiv = document.getElementById('carousel-dots');
     if (photosActuelles.length === 0) { container.style.display = 'none'; return; }
     container.style.display = 'block'; imagesDiv.innerHTML = ''; dotsDiv.innerHTML = ''; currentSlide = 0;
+    
     photosActuelles.forEach((url, index) => {
-        const img = document.createElement('img'); img.src = url; img.className = `carousel-slide ${index === 0 ? 'active' : ''}`;
-        img.alt = `${lexique[currentLang].altPhoto} ${nomAstre} (${index + 1}/${photosActuelles.length})`; imagesDiv.appendChild(img);
-        if (photosActuelles.length > 1) { const dot = document.createElement('div'); dot.className = `dot ${index === 0 ? 'active' : ''}`; dot.addEventListener('click', () => afficherSlide(index)); dotsDiv.appendChild(dot); }
+        const img = document.createElement('img'); 
+        img.src = url; 
+        img.className = `carousel-slide ${index === 0 ? 'active' : ''}`;
+        img.alt = `${lexique[currentLang].altPhoto} ${nomAstre} (${index + 1}/${photosActuelles.length})`; 
+        
+        // Clic sur l'image = Ouverture de la Lightbox plein écran
+        img.addEventListener('click', () => {
+            lightboxImg.src = img.src;
+            lightboxImg.alt = img.alt;
+            lightboxModal.classList.add('ouvert');
+            lightboxModal.setAttribute('aria-hidden', 'false');
+        });
+
+        imagesDiv.appendChild(img);
+
+        if (photosActuelles.length > 1) { 
+            const dot = document.createElement('div'); dot.className = `dot ${index === 0 ? 'active' : ''}`; 
+            dot.addEventListener('click', () => afficherSlide(index)); dotsDiv.appendChild(dot); 
+        }
     });
     document.getElementById('prev-btn').style.display = photosActuelles.length > 1 ? 'block' : 'none'; document.getElementById('next-btn').style.display = photosActuelles.length > 1 ? 'block' : 'none';
 }
@@ -142,7 +162,6 @@ function ouvrirPanneau(donnees) {
 function construireLegende() {
     const conteneurFiltres = document.getElementById('filter-container');
     const etatsCoches = {}; document.querySelectorAll('#filter-container input').forEach(input => { etatsCoches[input.value] = input.checked; });
-    
     conteneurFiltres.innerHTML = '';
     const typesPresents = new Set(astresCharges.map(item => item.donnees.typeAstre || "unknown"));
 
@@ -150,7 +169,6 @@ function construireLegende() {
         const label = document.createElement('label'); label.className = 'filter-item';
         const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.value = typeKey;
         checkbox.checked = etatsCoches[typeKey] !== undefined ? etatsCoches[typeKey] : true;
-        
         checkbox.addEventListener('change', appliquerFiltresLegende);
         const texteAffiche = typesTraduction[typeKey] ? typesTraduction[typeKey][currentLang] : typeKey;
         label.appendChild(checkbox); label.appendChild(document.createTextNode(texteAffiche)); conteneurFiltres.appendChild(label);
@@ -196,30 +214,17 @@ async function chargerCartePublique() {
             
             if (calque) {
                 const cAssigne = astre.calqueAssigne || "principal";
-                if (groupesFormesPublic[cAssigne]) {
-                    calque.addTo(groupesFormesPublic[cAssigne]);
-                } else {
-                    calque.addTo(map);
-                }
+                if (groupesFormesPublic[cAssigne]) { calque.addTo(groupesFormesPublic[cAssigne]); } else { calque.addTo(map); }
                 
                 calque.bindTooltip(astre.nom[currentLang] || astre.nom.fr, { direction: 'top', className: 'tooltip-perso' });
                 calque.on('tooltipopen', (e) => { renderMathInElement(e.tooltip._container, { delimiters: [{left: '$', right: '$', display: false}], throwOnError: false }); });
                 
-                calque.on('click', (ev) => { 
-                    L.DomEvent.stopPropagation(ev); ouvrirPanneau(astre); 
-                    let centre = astre.forme === 'polygone' ? calque.getBounds().getCenter() : L.latLng(coords[0], coords[1]); 
-                    map.flyTo(centre, map.getZoom(), { duration: 0.5 }); 
-                });
-                
+                calque.on('click', (ev) => { L.DomEvent.stopPropagation(ev); ouvrirPanneau(astre); let centre = astre.forme === 'polygone' ? calque.getBounds().getCenter() : L.latLng(coords[0], coords[1]); map.flyTo(centre, map.getZoom(), { duration: 0.5 }); });
                 astresCharges.push({ calque: calque, donnees: astre });
             }
         });
         
         map.on('overlayadd overlayremove', appliquerFiltresLegende);
         construireLegende();
-    } catch (erreur) { 
-        // DEBUG CRITIQUE : Échec global de récupération de la collection de galaxies dans Firebase
-        console.error("Erreur critique BDD (galaxies) :", erreur); 
-        alert("🚨 Erreur de chargement des objets astronomiques !\n\nImpossible de récupérer la liste des astres depuis la base de données.\n\nCode d'erreur de diagnostic :\n" + erreur.message);
-    }
+    } catch (erreur) { console.error("Erreur critique BDD :", erreur); }
 }

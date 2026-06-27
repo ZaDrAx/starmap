@@ -134,28 +134,35 @@
             <details>
                 <summary>Paramètres Physiques</summary>
                 <div class="details-content">
+                    <div>
+                        <label>Type d'astre :</label>
+                        <select id="type-astre">
+                            <option value="smg">SMG (Submillimeter Galaxy)</option>
+                            <option value="lrd">LRD (Little Red Dot)</option>
+                            <option value="candidate">Candidate (Unconfirmed)</option>
+                            <option value="quasar">Quasar</option>
+                            <option value="spiral">Spiral Galaxy</option>
+                            <option value="elliptical">Elliptical Galaxy</option>
+                            <option value="unknown">Unknown / Area Contour</option>
+                        </select>
+                    </div>
+
                     <div class="flex-row">
-                        <div class="flex-col">
-                            <label>Type d'astre :</label>
-                            <select id="type-astre">
-                                <option value="smg">SMG (Submillimeter Galaxy)</option>
-                                <option value="lrd">LRD (Little Red Dot)</option>
-                                <option value="candidate">Candidate (Unconfirmed)</option>
-                                <option value="quasar">Quasar</option>
-                                <option value="spiral">Spiral Galaxy</option>
-                                <option value="elliptical">Elliptical Galaxy</option>
-                                <option value="unknown">Unknown / Area Contour</option>
-                            </select>
-                        </div>
+                        <div class="flex-col"><label>L'$_{CO}$ ($K\,km\,s^{-1}\,pc^2$) :</label><input type="text" id="lco"></div>
+                        <div class="flex-col"><label>FWHM :</label><input type="text" id="fwhm"></div>
+                    </div>
+                    <div class="flex-row">
+                        <div class="flex-col"><label>$M_{gas}$ ($M_{\odot}$) :</label><input type="text" id="mgas"></div>
+                        <div class="flex-col"><label>SFE :</label><input type="text" id="sfe"></div>
+                    </div>
+                    <div class="flex-row">
+                        <div class="flex-col"><label>RA :</label><input type="text" id="ra"></div>
+                        <div class="flex-col"><label>DEC :</label><input type="text" id="dec"></div>
+                    </div>
+                    <div class="flex-row">
                         <div class="flex-col"><label>Redshift ($z$ ou $z_{CO}$) :</label><input type="text" id="redshift"></div>
                     </div>
-                    <div class="flex-row">
-                        <div class="flex-col"><label>Masse ($M_{\odot}$) :</label><input type="text" id="masse"></div>
-                        <div class="flex-col"><label>Masse Gaz ($M_{\odot}$) :</label><input type="text" id="masse-gaz"></div>
-                    </div>
-                    <div class="flex-row">
-                        <div class="flex-col"><label>Taux de formation (SFR) :</label><input type="text" id="sfr"></div>
-                    </div>
+
                     <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); width: 100%; margin: 10px 0;">
                     <div id="conteneur-champs-perso"></div>
                     <button type="button" class="btn-outil" id="btn-ajouter-champ" style="margin-top: 5px; border: 1px dashed rgba(0,255,255,0.5); color: #00FFFF; background: rgba(0,255,255,0.1);">+ Ajouter paramètre personnalisé trilingue</button>
@@ -206,6 +213,8 @@
             </details>
 
             <button type="button" class="btn-submit" id="btn-sauvegarder">Enregistrer l'Astre / la Zone</button>
+            
+            <button type="button" class="btn-submit" id="btn-supprimer" style="background: rgba(220, 53, 69, 0.8); border-color: #dc3545; display: none; margin-top: 10px;">🗑️ Supprimer cet Astre</button>
         </div>
 
         <div id="vue-bibliotheque" style="display: none;">

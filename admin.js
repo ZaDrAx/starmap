@@ -1,4 +1,4 @@
-import { db, collection, addDoc, getDocs, doc, updateDoc, setDoc, getDoc } from './config.js';
+import { db, collection, addDoc, getDocs, doc, updateDoc, setDoc, getDoc, deleteDoc } from './config.js';
 
 const map = L.map('map', { crs: L.CRS.Simple, minZoom: -2, zoomControl: false });
 let calquesLeaflet = []; 
@@ -6,7 +6,6 @@ let controleCalques = null;
 let groupesFormesAdmin = {}; 
 let bounds = [[0,0], [1000,1000]]; 
 
-// --- GESTION DES CALQUES DANS L'ADMIN ---
 const conteneurCalques = document.getElementById('conteneur-images-calques');
 
 function ajouterLigneCalqueAdmin(nom = '', url = '') {
@@ -14,7 +13,7 @@ function ajouterLigneCalqueAdmin(nom = '', url = '') {
     ligne.className = 'champ-calque-ligne flex-row'; ligne.style.cssText = 'background:rgba(0,0,0,0.3); padding:8px; border-radius:8px; margin-bottom:5px;';
     ligne.innerHTML = `
         <div class="flex-col" style="flex: 1;"><input type="text" placeholder="Nom (ex: Contours ALMA)" class="calque-nom" value="${nom}"></div>
-        <div class="flex-col" style="flex: 2;"><input type="text" placeholder="URL Image (Laisser vide pour formes dessinnées)" class="calque-url" value="${url}"></div>
+        <div class="flex-col" style="flex: 2;"><input type="text" placeholder="URL Image (Laisser vide pour formes)" class="calque-url" value="${url}"></div>
         <button type="button" class="btn-supprimer-champ">✖</button>
     `;
     ligne.querySelector('.btn-supprimer-champ').addEventListener('click', () => ligne.remove());
@@ -28,16 +27,10 @@ async function chargerImageFond() {
         const docSnap = await getDoc(doc(db, "parametres", "carte"));
         if (docSnap.exists()) {
             const data = docSnap.data();
-            // Rétrocompatibilité : On lit les anciens formats ou les nouveaux
-            if (data.calques && data.calques.length > 0) {
-                calquesDB = data.calques;
-            } else if (data.url) { 
-                calquesDB = [{ nom: "Carte de base", url: data.url }];
-            }
+            if (data.calques && data.calques.length > 0) calquesDB = data.calques;
+            else if (data.url) calquesDB = [{ nom: "Carte de base", url: data.url }];
         }
-    } catch(erreur) { 
-        console.error("Erreur Firebase (Paramètres Carte) :", erreur);
-    }
+    } catch(erreur) { console.error("Erreur Firebase (Paramètres Carte) :", erreur); }
 
     conteneurCalques.innerHTML = '';
     calquesDB.forEach(c => ajouterLigneCalqueAdmin(c.nom, c.url));
@@ -51,50 +44,31 @@ async function chargerImageFond() {
     if (controleCalques) { map.removeControl(controleCalques); controleCalques = null; }
     calquesLeaflet.forEach(l => map.removeLayer(l));
     Object.values(groupesFormesAdmin).forEach(g => map.removeLayer(g));
-    calquesLeaflet = [];
-    groupesFormesAdmin = {};
+    calquesLeaflet = []; groupesFormesAdmin = {};
 
-    // Fonction de sécurité : garantit le lancement du site quoi qu'il arrive
     function finaliserChargement(h, w) {
         bounds = [[0, 0], [h, w]];
         const overlays = {};
         
         calquesDB.forEach((c, index) => {
             if (index === 0) {
-                if (c.url) {
-                    const layer = L.imageOverlay(c.url, bounds).addTo(map);
-                    calquesLeaflet.push(layer);
-                }
+                if (c.url) { const layer = L.imageOverlay(c.url, bounds).addTo(map); calquesLeaflet.push(layer); }
             } else if (c.url) {
-                const layer = L.imageOverlay(c.url, bounds);
-                calquesLeaflet.push(layer);
-                overlays[c.nom || `Image Overlay ${index}`] = layer;
+                const layer = L.imageOverlay(c.url, bounds); calquesLeaflet.push(layer); overlays[c.nom || `Image Overlay ${index}`] = layer;
             } else if (c.nom) {
-                const group = L.featureGroup().addTo(map);
-                groupesFormesAdmin[c.nom] = group;
-                overlays[c.nom] = group;
+                const group = L.featureGroup().addTo(map); groupesFormesAdmin[c.nom] = group; overlays[c.nom] = group;
             }
         });
 
-        if (Object.keys(overlays).length > 0) {
-            controleCalques = L.control.layers({}, overlays, { position: 'topright' }).addTo(map);
-        }
-        map.fitBounds(bounds);
-        chargerListeEtCarte(); // DÉMARRE LES ASTRES !
+        if (Object.keys(overlays).length > 0) controleCalques = L.control.layers({}, overlays, { position: 'topright' }).addTo(map);
+        map.fitBounds(bounds); chargerListeEtCarte(); 
     }
 
-    if (!calquesDB[0].url) {
-        finaliserChargement(1000, 1000);
-    } else {
+    if (!calquesDB[0].url) { finaliserChargement(1000, 1000); } 
+    else {
         const img = new Image();
-        // Si l'image est morte, on force le chargement des astres quand même
-        img.onerror = function() {
-            alert("🚨 ADMIN DEBUG - Impossible de charger l'image de la carte ! Mais les données vont s'afficher.");
-            finaliserChargement(1000, 1000); 
-        };
-        img.onload = function() {
-            finaliserChargement(img.naturalHeight || 1000, img.naturalWidth || 1000);
-        }
+        img.onerror = function() { alert("🚨 ADMIN DEBUG - Impossible de charger l'image de la carte ! Mais les données vont s'afficher."); finaliserChargement(1000, 1000); };
+        img.onload = function() { finaliserChargement(img.naturalHeight || 1000, img.naturalWidth || 1000); }
         img.src = calquesDB[0].url;
     }
 }
@@ -113,8 +87,7 @@ document.getElementById('btn-maj-carte').addEventListener('click', async () => {
     status.innerText = "⏳ Enregistrement..."; status.style.color = "#00FFFF";
     try {
         await setDoc(doc(db, "parametres", "carte"), { calques: nouveauxCalques });
-        status.innerText = "✅ Calques synchronisés !"; status.style.color = "#28a745";
-        await chargerImageFond(); 
+        status.innerText = "✅ Calques synchronisés !"; status.style.color = "#28a745"; await chargerImageFond(); 
     } catch (erreur) { 
         status.innerText = "❌ Échec de la sauvegarde."; status.style.color = "#ff4d4d"; 
         alert("🚨 ADMIN DEBUG - Sauvegarde des calques refusée :\n" + erreur.message);
@@ -158,7 +131,7 @@ function ajouterChampPersonnalise(nom = '', valFr = '', valEn = '', valEs = '') 
     ligne.style.cssText = 'background:rgba(255,255,255,0.05); padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid rgba(255,255,255,0.1);';
     ligne.innerHTML = `
         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-            <select class="latex-helper"><option value="">+ LaTeX...</option><option value="$z_{CO}$">z_CO</option><option value="$M_{\\odot}$">M_sol</option></select>
+            <select class="latex-helper"><option value="">+ LaTeX...</option><option value="$z_{CO}$">z_CO</option><option value="$L_{IR}$">L_IR</option><option value="$M_{\\odot}$">M_sol</option></select>
             <button type="button" class="btn-supprimer-champ">✖</button>
         </div>
         <input type="text" placeholder="Nom (ex: L_{IR})" class="champ-cle" value="${nom}" style="margin-bottom:5px;">
@@ -194,9 +167,17 @@ initialiserSliders();
 ['couleur-fond', 'couleur-contour'].forEach(id => { document.getElementById(id).addEventListener('input', () => { if (formeTemporaire) formeTemporaire.setStyle(getStyleActuel()); }); });
 
 function resetFormulaire() {
-    document.getElementById('id-edition').value = ""; document.getElementById('titre-formulaire').innerText = "Nouvel Astre"; document.getElementById('btn-nouveau').style.display = 'none';
+    document.getElementById('id-edition').value = ""; document.getElementById('titre-formulaire').innerText = "Nouvel Astre"; 
+    document.getElementById('btn-nouveau').style.display = 'none';
+    
+    // NOUVEAU : On cache le bouton supprimer lors de la création d'un nouvel astre
+    document.getElementById('btn-supprimer').style.display = 'none';
+
     ['fr', 'en', 'es'].forEach(l => { document.getElementById(`nom-${l}`).value = ""; document.getElementById(`description-${l}`).value = ""; document.getElementById(`tags-${l}`).value = ""; });
-    document.getElementById('redshift').value = ""; document.getElementById('masse').value = ""; document.getElementById('masse-gaz').value = ""; document.getElementById('sfr').value = "";
+    
+    document.getElementById('lco').value = ""; document.getElementById('fwhm').value = ""; document.getElementById('mgas').value = ""; document.getElementById('sfe').value = "";
+    document.getElementById('ra').value = ""; document.getElementById('dec').value = ""; document.getElementById('redshift').value = "";
+    
     document.getElementById('type-astre').value = "smg"; document.getElementById('calque-assigne').value = "principal"; conteneurChampsPerso.innerHTML = ''; conteneurPhotos.innerHTML = '';
     document.getElementById('taille').value = 30; document.getElementById('opacite-fond').value = 0.5; document.getElementById('epaisseur-contour').value = 2; document.getElementById('opacite-contour').value = 1.0;
     document.querySelectorAll('input[type="range"]').forEach(s => s.dispatchEvent(new Event('input')));
@@ -244,17 +225,33 @@ document.getElementById('btn-sauvegarder').addEventListener('click', async () =>
         tags: { fr: document.getElementById('tags-fr').value.split(',').map(t=>t.trim()), en: document.getElementById('tags-en').value.split(',').map(t=>t.trim()), es: document.getElementById('tags-es').value.split(',').map(t=>t.trim()) },
         typeAstre: document.getElementById('type-astre').value,
         calqueAssigne: document.getElementById('calque-assigne').value,
-        redshift: document.getElementById('redshift').value, masse: document.getElementById('masse').value, masseGaz: document.getElementById('masse-gaz').value, sfr: document.getElementById('sfr').value,
+        lco: document.getElementById('lco').value, fwhm: document.getElementById('fwhm').value, mgas: document.getElementById('mgas').value, sfe: document.getElementById('sfe').value,
+        ra: document.getElementById('ra').value, dec: document.getElementById('dec').value, redshift: document.getElementById('redshift').value,
         photos: recupererPhotos(), parametresPersonnalises: recupererChampsPersonnalises(),
         forme: document.getElementById('forme').value, taille: parseInt(document.getElementById('taille').value), coordonnees: JSON.stringify(coordonneesFinales), style: getStyleActuel()
     };
     try {
         if (idEdition) await updateDoc(doc(db, "galaxies", idEdition), donnees); else await addDoc(collection(db, "galaxies"), donnees);
         resetFormulaire(); await chargerImageFond(); document.querySelector('.onglet-btn[data-cible="vue-bibliotheque"]').click();
-    } catch (erreur) { 
-        // DEBUG ADMIN : Échec de la création/modification d'un astre
-        console.error("Erreur d'écriture BDD (Galaxie) :", erreur);
-        alert("🚨 ADMIN DEBUG - Impossible de sauvegarder l'astre :\n" + erreur.message); 
+    } catch (erreur) { console.error("Erreur d'écriture BDD (Galaxie) :", erreur); alert("🚨 ADMIN DEBUG - Impossible de sauvegarder l'astre :\n" + erreur.message); }
+});
+
+// NOUVEAU : LA FONCTION DE SUPPRESSION D'ASTRE
+document.getElementById('btn-supprimer').addEventListener('click', async () => {
+    const idEdition = document.getElementById('id-edition').value;
+    if (!idEdition) return;
+
+    if (confirm("⚠️ Êtes-vous sûr de vouloir supprimer définitivement cet astre ? Cette action est irréversible.")) {
+        try {
+            await deleteDoc(doc(db, "galaxies", idEdition));
+            alert("✅ Astre supprimé avec succès !");
+            resetFormulaire();
+            await chargerImageFond(); // Recharge la carte pour l'enlever visuellement
+            document.querySelector('.onglet-btn[data-cible="vue-bibliotheque"]').click();
+        } catch (erreur) {
+            console.error("Erreur lors de la suppression :", erreur);
+            alert("🚨 ADMIN DEBUG - Impossible de supprimer l'astre :\n" + erreur.message);
+        }
     }
 });
 
@@ -270,22 +267,31 @@ async function chargerListeEtCarte() {
             
             if (calque) {
                 const destCalque = astre.calqueAssigne || "principal";
-                if (groupesFormesAdmin[destCalque]) {
-                    calque.addTo(groupesFormesAdmin[destCalque]);
-                } else {
-                    calque.addTo(map); 
-                }
+                if (groupesFormesAdmin[destCalque]) { calque.addTo(groupesFormesAdmin[destCalque]); } else { calque.addTo(map); }
                 calque.bindTooltip(astre.nom.fr);
             }
 
             const li = document.createElement('li'); li.innerHTML = `<span>✏️ ${astre.nom.fr}</span>`;
             li.addEventListener('click', () => {
                 document.querySelector('.onglet-btn[data-cible="vue-editeur"]').click();
-                document.getElementById('id-edition').value = id; document.getElementById('titre-formulaire').innerText = "Modifier : " + astre.nom.fr; document.getElementById('btn-nouveau').style.display = 'block';
+                document.getElementById('id-edition').value = id; 
+                document.getElementById('titre-formulaire').innerText = "Modifier : " + astre.nom.fr; 
+                
+                document.getElementById('btn-nouveau').style.display = 'block';
+                // NOUVEAU : Fait apparaitre le bouton Supprimer
+                document.getElementById('btn-supprimer').style.display = 'block';
+
                 ['fr', 'en', 'es'].forEach(l => { document.getElementById(`nom-${l}`).value = astre.nom[l] || ""; document.getElementById(`description-${l}`).value = astre.description[l] || ""; document.getElementById(`tags-${l}`).value = astre.tags && astre.tags[l] ? astre.tags[l].join(', ') : ""; });
                 document.getElementById('type-astre').value = astre.typeAstre || "smg";
                 document.getElementById('calque-assigne').value = astre.calqueAssigne || "principal";
-                document.getElementById('redshift').value = astre.redshift || ""; document.getElementById('masse').value = astre.masse || ""; document.getElementById('masse-gaz').value = astre.masseGaz || ""; document.getElementById('sfr').value = astre.sfr || "";
+                
+                document.getElementById('lco').value = astre.lco || "";
+                document.getElementById('fwhm').value = astre.fwhm || "";
+                document.getElementById('mgas').value = astre.mgas || "";
+                document.getElementById('sfe').value = astre.sfe || "";
+                document.getElementById('ra').value = astre.ra || "";
+                document.getElementById('dec').value = astre.dec || "";
+                document.getElementById('redshift').value = astre.redshift || "";
                 
                 conteneurChampsPerso.innerHTML = '';
                 if (astre.parametresPersonnalises && astre.parametresPersonnalises.fr) { Object.keys(astre.parametresPersonnalises.fr).forEach(cle => { ajouterChampPersonnalise(cle, astre.parametresPersonnalises.fr[cle], astre.parametresPersonnalises.en[cle], astre.parametresPersonnalises.es[cle]); }); }
@@ -301,9 +307,5 @@ async function chargerListeEtCarte() {
             });
             document.getElementById('liste-astres').appendChild(li); astresAffiches[id] = { calque: calque, li: li, donnees: astre };
         });
-    } catch(erreur) {
-        // DEBUG ADMIN : Échec lecture BDD (Galaxies)
-        console.error("Erreur lecture BDD (Galaxies) :", erreur);
-        alert("🚨 ADMIN DEBUG - Impossible de charger la liste des astres :\n" + erreur.message);
-    }
+    } catch(erreur) { console.error("Erreur lecture BDD (Galaxies) :", erreur); alert("🚨 ADMIN DEBUG - Impossible de charger la liste des astres :\n" + erreur.message); }
 }
