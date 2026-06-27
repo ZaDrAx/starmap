@@ -1,4 +1,4 @@
-import { db, collection, addDoc, getDocs, doc, updateDoc, setDoc, getDoc, deleteDoc } from './config.js';
+import { db, auth, collection, addDoc, getDocs, doc, updateDoc, setDoc, getDoc, deleteDoc, signInWithEmailAndPassword, onAuthStateChanged, signOut } from './config.js';
 
 const map = L.map('map', { crs: L.CRS.Simple, minZoom: -2, zoomControl: false });
 let calquesLeaflet = []; 
@@ -6,6 +6,52 @@ let controleCalques = null;
 let groupesFormesAdmin = {}; 
 let bounds = [[0,0], [1000,1000]]; 
 
+// --- GESTION DE L'AUTHENTIFICATION ---
+const loginScreen = document.getElementById('login-screen');
+const adminPanel = document.getElementById('admin-panel');
+let appInitialisee = false;
+
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        // Utilisateur Connecté
+        loginScreen.style.opacity = '0';
+        setTimeout(() => loginScreen.style.display = 'none', 500); // Disparition fluide
+        adminPanel.style.display = 'flex';
+        
+        // On ne charge la carte et la base de données QUE si c'est le premier lancement après connexion
+        if (!appInitialisee) {
+            map.invalidateSize(); // Sécurité pour que Leaflet comprenne la taille de l'écran
+            chargerImageFond();
+            appInitialisee = true;
+        }
+    } else {
+        // Utilisateur Déconnecté
+        loginScreen.style.display = 'flex';
+        loginScreen.style.opacity = '1';
+        adminPanel.style.display = 'none';
+        appInitialisee = false;
+    }
+});
+
+document.getElementById('btn-login').addEventListener('click', async () => {
+    const email = document.getElementById('email-login').value;
+    const pass = document.getElementById('password-login').value;
+    const errBox = document.getElementById('login-error');
+    try {
+        await signInWithEmailAndPassword(auth, email, pass);
+        errBox.style.display = 'none';
+    } catch (error) {
+        errBox.style.display = 'block';
+        errBox.innerText = "Accès refusé. Vérifiez vos identifiants.";
+        console.error(error);
+    }
+});
+
+document.getElementById('btn-logout').addEventListener('click', () => {
+    signOut(auth);
+});
+
+// --- GESTION DES CALQUES DANS L'ADMIN ---
 const conteneurCalques = document.getElementById('conteneur-images-calques');
 
 function ajouterLigneCalqueAdmin(nom = '', url = '') {
@@ -72,7 +118,6 @@ async function chargerImageFond() {
         img.src = calquesDB[0].url;
     }
 }
-chargerImageFond();
 
 document.getElementById('btn-maj-carte').addEventListener('click', async () => {
     const status = document.getElementById('upload-status');
@@ -169,8 +214,6 @@ initialiserSliders();
 function resetFormulaire() {
     document.getElementById('id-edition').value = ""; document.getElementById('titre-formulaire').innerText = "Nouvel Astre"; 
     document.getElementById('btn-nouveau').style.display = 'none';
-    
-    // NOUVEAU : On cache le bouton supprimer lors de la création d'un nouvel astre
     document.getElementById('btn-supprimer').style.display = 'none';
 
     ['fr', 'en', 'es'].forEach(l => { document.getElementById(`nom-${l}`).value = ""; document.getElementById(`description-${l}`).value = ""; document.getElementById(`tags-${l}`).value = ""; });
@@ -236,7 +279,6 @@ document.getElementById('btn-sauvegarder').addEventListener('click', async () =>
     } catch (erreur) { console.error("Erreur d'écriture BDD (Galaxie) :", erreur); alert("🚨 ADMIN DEBUG - Impossible de sauvegarder l'astre :\n" + erreur.message); }
 });
 
-// NOUVEAU : LA FONCTION DE SUPPRESSION D'ASTRE
 document.getElementById('btn-supprimer').addEventListener('click', async () => {
     const idEdition = document.getElementById('id-edition').value;
     if (!idEdition) return;
@@ -246,7 +288,7 @@ document.getElementById('btn-supprimer').addEventListener('click', async () => {
             await deleteDoc(doc(db, "galaxies", idEdition));
             alert("✅ Astre supprimé avec succès !");
             resetFormulaire();
-            await chargerImageFond(); // Recharge la carte pour l'enlever visuellement
+            await chargerImageFond(); 
             document.querySelector('.onglet-btn[data-cible="vue-bibliotheque"]').click();
         } catch (erreur) {
             console.error("Erreur lors de la suppression :", erreur);
@@ -278,20 +320,14 @@ async function chargerListeEtCarte() {
                 document.getElementById('titre-formulaire').innerText = "Modifier : " + astre.nom.fr; 
                 
                 document.getElementById('btn-nouveau').style.display = 'block';
-                // NOUVEAU : Fait apparaitre le bouton Supprimer
                 document.getElementById('btn-supprimer').style.display = 'block';
 
                 ['fr', 'en', 'es'].forEach(l => { document.getElementById(`nom-${l}`).value = astre.nom[l] || ""; document.getElementById(`description-${l}`).value = astre.description[l] || ""; document.getElementById(`tags-${l}`).value = astre.tags && astre.tags[l] ? astre.tags[l].join(', ') : ""; });
                 document.getElementById('type-astre').value = astre.typeAstre || "smg";
                 document.getElementById('calque-assigne').value = astre.calqueAssigne || "principal";
                 
-                document.getElementById('lco').value = astre.lco || "";
-                document.getElementById('fwhm').value = astre.fwhm || "";
-                document.getElementById('mgas').value = astre.mgas || "";
-                document.getElementById('sfe').value = astre.sfe || "";
-                document.getElementById('ra').value = astre.ra || "";
-                document.getElementById('dec').value = astre.dec || "";
-                document.getElementById('redshift').value = astre.redshift || "";
+                document.getElementById('lco').value = astre.lco || ""; document.getElementById('fwhm').value = astre.fwhm || ""; document.getElementById('mgas').value = astre.mgas || ""; document.getElementById('sfe').value = astre.sfe || "";
+                document.getElementById('ra').value = astre.ra || ""; document.getElementById('dec').value = astre.dec || ""; document.getElementById('redshift').value = astre.redshift || "";
                 
                 conteneurChampsPerso.innerHTML = '';
                 if (astre.parametresPersonnalises && astre.parametresPersonnalises.fr) { Object.keys(astre.parametresPersonnalises.fr).forEach(cle => { ajouterChampPersonnalise(cle, astre.parametresPersonnalises.fr[cle], astre.parametresPersonnalises.en[cle], astre.parametresPersonnalises.es[cle]); }); }

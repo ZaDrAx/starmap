@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Administration - Carte de l'Espace</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
@@ -14,7 +13,15 @@
         #map { width: 100%; height: 100%; position: absolute; z-index: 1; }
         .leaflet-container { background: #000 !important; }
         
-        #admin-panel { position: absolute; right: 20px; top: 20px; bottom: 20px; width: 450px; z-index: 10; background: rgba(20, 20, 30, 0.75); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 20px; padding: 20px; box-sizing: border-box; overflow-y: auto; color: white; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; gap: 15px; }
+        /* NOUVEAU : ÉCRAN DE CONNEXION */
+        #login-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 99999; display: flex; justify-content: center; align-items: center; transition: opacity 0.5s; }
+        .login-box { background: rgba(20, 20, 30, 0.9); padding: 40px; border-radius: 15px; border: 1px solid #00FFFF; text-align: center; color: white; box-shadow: 0 0 30px rgba(0,255,255,0.2); width: 300px; }
+        .login-box input { width: 100%; padding: 12px; margin-bottom: 15px; box-sizing: border-box; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 5px; outline: none; }
+        .login-box input:focus { border-color: #00FFFF; }
+        #btn-logout { background: rgba(255,0,0,0.1); border: 1px solid #ff4d4d; color: #ff4d4d; padding: 5px 10px; border-radius: 5px; cursor: pointer; transition: 0.2s; font-weight: bold; }
+        #btn-logout:hover { background: #ff4d4d; color: white; }
+
+        #admin-panel { position: absolute; right: 20px; top: 20px; bottom: 20px; width: 450px; z-index: 10; background: rgba(20, 20, 30, 0.75); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 20px; padding: 20px; box-sizing: border-box; overflow-y: auto; color: white; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; gap: 15px; }
         #admin-panel::-webkit-scrollbar { width: 8px; } #admin-panel::-webkit-scrollbar-thumb { background: rgba(0, 255, 255, 0.5); border-radius: 4px; }
         
         .onglets-container { display: flex; gap: 5px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px; }
@@ -79,13 +86,26 @@
     </style>
 </head>
 <body>
+    <div id="login-screen">
+        <div class="login-box">
+            <h2 style="margin-bottom: 20px; color: #00FFFF;">Connexion Admin</h2>
+            <input type="email" id="email-login" placeholder="Adresse Email">
+            <input type="password" id="password-login" placeholder="Mot de passe">
+            <button id="btn-login" class="btn-submit">S'identifier</button>
+            <div id="login-error" style="color: #ff4d4d; margin-top: 15px; font-size: 0.9em; display: none;"></div>
+        </div>
+    </div>
+
     <div id="map"></div>
 
-    <div id="admin-panel">
-        <div class="onglets-container">
-            <button class="onglet-btn active" data-cible="vue-editeur">✍️ Éditeur</button>
-            <button class="onglet-btn" data-cible="vue-bibliotheque">📚 Bibliothèque</button>
-            <button class="onglet-btn" data-cible="vue-parametres">⚙️ Carte & Calques</button>
+    <div id="admin-panel" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 10px;">
+            <div class="onglets-container" style="border:none; padding:0; margin:0; flex:1;">
+                <button class="onglet-btn active" data-cible="vue-editeur">✍️ Éditeur</button>
+                <button class="onglet-btn" data-cible="vue-bibliotheque">📚 Biblio</button>
+                <button class="onglet-btn" data-cible="vue-parametres">⚙️ Calques</button>
+            </div>
+            <button id="btn-logout" title="Se déconnecter de l'administration">Déconnexion</button>
         </div>
 
         <div id="vue-editeur">
@@ -213,7 +233,6 @@
             </details>
 
             <button type="button" class="btn-submit" id="btn-sauvegarder">Enregistrer l'Astre / la Zone</button>
-            
             <button type="button" class="btn-submit" id="btn-supprimer" style="background: rgba(220, 53, 69, 0.8); border-color: #dc3545; display: none; margin-top: 10px;">🗑️ Supprimer cet Astre</button>
         </div>
 
@@ -241,7 +260,7 @@
                 <p style="font-size: 0.83em; color: #ccc; text-align: center; line-height:1.4;">
                     Le 1er calque est l'image de fond.<br>
                     • Mettre un lien URL = <b>Calque d'image fixe Overlay</b>.<br>
-                    • Laisser l'URL vide = <b>Calque Vectoriel (Conteneur de formes dessinées cliquables)</b>.
+                    • Laisser l'URL vide = <b>Calque Vectoriel (Conteneur de formes)</b>.
                 </p>
                 
                 <div id="conteneur-images-calques"></div>
