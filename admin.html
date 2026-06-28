@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Administration - Carte de l'Espace</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
@@ -13,7 +14,6 @@
         #map { width: 100%; height: 100%; position: absolute; z-index: 1; }
         .leaflet-container { background: #000 !important; }
         
-        /* NOUVEAU : ÉCRAN DE CONNEXION */
         #login-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 99999; display: flex; justify-content: center; align-items: center; transition: opacity 0.5s; }
         .login-box { background: rgba(20, 20, 30, 0.9); padding: 40px; border-radius: 15px; border: 1px solid #00FFFF; text-align: center; color: white; box-shadow: 0 0 30px rgba(0,255,255,0.2); width: 300px; }
         .login-box input { width: 100%; padding: 12px; margin-bottom: 15px; box-sizing: border-box; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 5px; outline: none; }
@@ -21,7 +21,7 @@
         #btn-logout { background: rgba(255,0,0,0.1); border: 1px solid #ff4d4d; color: #ff4d4d; padding: 5px 10px; border-radius: 5px; cursor: pointer; transition: 0.2s; font-weight: bold; }
         #btn-logout:hover { background: #ff4d4d; color: white; }
 
-        #admin-panel { position: absolute; right: 20px; top: 20px; bottom: 20px; width: 450px; z-index: 10; background: rgba(20, 20, 30, 0.75); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 20px; padding: 20px; box-sizing: border-box; overflow-y: auto; color: white; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; gap: 15px; }
+        #admin-panel { position: absolute; right: 20px; top: 20px; bottom: 20px; width: 450px; z-index: 10; background: rgba(20, 20, 30, 0.75); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 20px; padding: 20px; box-sizing: border-box; overflow-y: auto; color: white; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; gap: 15px; }
         #admin-panel::-webkit-scrollbar { width: 8px; } #admin-panel::-webkit-scrollbar-thumb { background: rgba(0, 255, 255, 0.5); border-radius: 4px; }
         
         .onglets-container { display: flex; gap: 5px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px; }
@@ -168,19 +168,20 @@
                     </div>
 
                     <div class="flex-row">
-                        <div class="flex-col"><label>L'$_{CO}$ ($K\,km\,s^{-1}\,pc^2$) :</label><input type="text" id="lco"></div>
-                        <div class="flex-col"><label>FWHM :</label><input type="text" id="fwhm"></div>
+                        <div class="flex-col"><label>RA (J2000) :</label><input type="text" id="ra"></div>
+                        <div class="flex-col"><label>DEC (J2000) :</label><input type="text" id="dec"></div>
                     </div>
                     <div class="flex-row">
-                        <div class="flex-col"><label>$M_{gas}$ ($M_{\odot}$) :</label><input type="text" id="mgas"></div>
-                        <div class="flex-col"><label>SFE :</label><input type="text" id="sfe"></div>
+                        <div class="flex-col"><label>Redshift (z) :</label><input type="text" id="redshift"></div>
+                        <div class="flex-col"><label>SNR :</label><input type="text" id="snr"></div>
                     </div>
                     <div class="flex-row">
-                        <div class="flex-col"><label>RA :</label><input type="text" id="ra"></div>
-                        <div class="flex-col"><label>DEC :</label><input type="text" id="dec"></div>
+                        <div class="flex-col"><label>$L'_{CO}\ (10^{10}\ K\ km\ s^{-1}\ pc^2)$ :</label><input type="text" id="lco"></div>
+                        <div class="flex-col"><label>FWHM$_{CO}\ (km\ s^{-1})$ :</label><input type="text" id="fwhm"></div>
                     </div>
                     <div class="flex-row">
-                        <div class="flex-col"><label>Redshift ($z$ ou $z_{CO}$) :</label><input type="text" id="redshift"></div>
+                        <div class="flex-col"><label>$M_{gas}\ (10^{10}\ M_{\odot})$ :</label><input type="text" id="mgas"></div>
+                        <div class="flex-col"><label>SFE $(yr^{-1})$ :</label><input type="text" id="sfe"></div>
                     </div>
 
                     <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); width: 100%; margin: 10px 0;">

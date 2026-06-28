@@ -13,19 +13,16 @@ let appInitialisee = false;
 
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        // Utilisateur Connecté
         loginScreen.style.opacity = '0';
-        setTimeout(() => loginScreen.style.display = 'none', 500); // Disparition fluide
+        setTimeout(() => loginScreen.style.display = 'none', 500); 
         adminPanel.style.display = 'flex';
         
-        // On ne charge la carte et la base de données QUE si c'est le premier lancement après connexion
         if (!appInitialisee) {
-            map.invalidateSize(); // Sécurité pour que Leaflet comprenne la taille de l'écran
+            map.invalidateSize(); 
             chargerImageFond();
             appInitialisee = true;
         }
     } else {
-        // Utilisateur Déconnecté
         loginScreen.style.display = 'flex';
         loginScreen.style.opacity = '1';
         adminPanel.style.display = 'none';
@@ -211,6 +208,7 @@ function initialiserSliders() {
 initialiserSliders();
 ['couleur-fond', 'couleur-contour'].forEach(id => { document.getElementById(id).addEventListener('input', () => { if (formeTemporaire) formeTemporaire.setStyle(getStyleActuel()); }); });
 
+// RESET AVEC LES NOUVELLES VARIABLES
 function resetFormulaire() {
     document.getElementById('id-edition').value = ""; document.getElementById('titre-formulaire').innerText = "Nouvel Astre"; 
     document.getElementById('btn-nouveau').style.display = 'none';
@@ -218,8 +216,9 @@ function resetFormulaire() {
 
     ['fr', 'en', 'es'].forEach(l => { document.getElementById(`nom-${l}`).value = ""; document.getElementById(`description-${l}`).value = ""; document.getElementById(`tags-${l}`).value = ""; });
     
+    // NOUVEAUX IDS
+    document.getElementById('ra').value = ""; document.getElementById('dec').value = ""; document.getElementById('redshift').value = ""; document.getElementById('snr').value = "";
     document.getElementById('lco').value = ""; document.getElementById('fwhm').value = ""; document.getElementById('mgas').value = ""; document.getElementById('sfe').value = "";
-    document.getElementById('ra').value = ""; document.getElementById('dec').value = ""; document.getElementById('redshift').value = "";
     
     document.getElementById('type-astre').value = "smg"; document.getElementById('calque-assigne').value = "principal"; conteneurChampsPerso.innerHTML = ''; conteneurPhotos.innerHTML = '';
     document.getElementById('taille').value = 30; document.getElementById('opacite-fond').value = 0.5; document.getElementById('epaisseur-contour').value = 2; document.getElementById('opacite-contour').value = 1.0;
@@ -258,6 +257,7 @@ function dessinerPolygoneActuel() { if (formeTemporaire) map.removeLayer(formeTe
 document.getElementById('btn-undo').addEventListener('click', () => { if (pointsPolygone.length > 0 && !polygoneTermine) { historiqueRedo.push(pointsPolygone.pop()); map.removeLayer(marqueursSommets.pop()); dessinerPolygoneActuel(); coordonneesFinales = [...pointsPolygone]; } });
 document.getElementById('btn-terminer').addEventListener('click', () => { if (pointsPolygone.length > 2) { polygoneTermine = true; alert("Forme verrouillée !"); } });
 
+// SAUVEGARDE AVEC NOUVELLES VARIABLES
 document.getElementById('btn-sauvegarder').addEventListener('click', async () => {
     const idEdition = document.getElementById('id-edition').value; const nomFr = document.getElementById('nom-fr').value.trim();
     if (!nomFr || !coordonneesFinales) return alert("Remplissez au moins le nom (FR) et dessinez une forme.");
@@ -268,8 +268,16 @@ document.getElementById('btn-sauvegarder').addEventListener('click', async () =>
         tags: { fr: document.getElementById('tags-fr').value.split(',').map(t=>t.trim()), en: document.getElementById('tags-en').value.split(',').map(t=>t.trim()), es: document.getElementById('tags-es').value.split(',').map(t=>t.trim()) },
         typeAstre: document.getElementById('type-astre').value,
         calqueAssigne: document.getElementById('calque-assigne').value,
-        lco: document.getElementById('lco').value, fwhm: document.getElementById('fwhm').value, mgas: document.getElementById('mgas').value, sfe: document.getElementById('sfe').value,
-        ra: document.getElementById('ra').value, dec: document.getElementById('dec').value, redshift: document.getElementById('redshift').value,
+        
+        ra: document.getElementById('ra').value, 
+        dec: document.getElementById('dec').value, 
+        redshift: document.getElementById('redshift').value,
+        snr: document.getElementById('snr').value,
+        lco: document.getElementById('lco').value, 
+        fwhm: document.getElementById('fwhm').value, 
+        mgas: document.getElementById('mgas').value, 
+        sfe: document.getElementById('sfe').value,
+        
         photos: recupererPhotos(), parametresPersonnalises: recupererChampsPersonnalises(),
         forme: document.getElementById('forme').value, taille: parseInt(document.getElementById('taille').value), coordonnees: JSON.stringify(coordonneesFinales), style: getStyleActuel()
     };
@@ -282,21 +290,16 @@ document.getElementById('btn-sauvegarder').addEventListener('click', async () =>
 document.getElementById('btn-supprimer').addEventListener('click', async () => {
     const idEdition = document.getElementById('id-edition').value;
     if (!idEdition) return;
-
     if (confirm("⚠️ Êtes-vous sûr de vouloir supprimer définitivement cet astre ? Cette action est irréversible.")) {
         try {
             await deleteDoc(doc(db, "galaxies", idEdition));
             alert("✅ Astre supprimé avec succès !");
-            resetFormulaire();
-            await chargerImageFond(); 
-            document.querySelector('.onglet-btn[data-cible="vue-bibliotheque"]').click();
-        } catch (erreur) {
-            console.error("Erreur lors de la suppression :", erreur);
-            alert("🚨 ADMIN DEBUG - Impossible de supprimer l'astre :\n" + erreur.message);
-        }
+            resetFormulaire(); await chargerImageFond(); document.querySelector('.onglet-btn[data-cible="vue-bibliotheque"]').click();
+        } catch (erreur) { console.error("Erreur lors de la suppression :", erreur); alert("🚨 ADMIN DEBUG - Impossible de supprimer l'astre :\n" + erreur.message); }
     }
 });
 
+// CHARGEMENT DE LA BIBLIOTHEQUE AVEC NOUVELLES VARIABLES
 async function chargerListeEtCarte() {
     try {
         document.getElementById('liste-astres').innerHTML = '';
@@ -318,16 +321,20 @@ async function chargerListeEtCarte() {
                 document.querySelector('.onglet-btn[data-cible="vue-editeur"]').click();
                 document.getElementById('id-edition').value = id; 
                 document.getElementById('titre-formulaire').innerText = "Modifier : " + astre.nom.fr; 
-                
-                document.getElementById('btn-nouveau').style.display = 'block';
-                document.getElementById('btn-supprimer').style.display = 'block';
+                document.getElementById('btn-nouveau').style.display = 'block'; document.getElementById('btn-supprimer').style.display = 'block';
 
                 ['fr', 'en', 'es'].forEach(l => { document.getElementById(`nom-${l}`).value = astre.nom[l] || ""; document.getElementById(`description-${l}`).value = astre.description[l] || ""; document.getElementById(`tags-${l}`).value = astre.tags && astre.tags[l] ? astre.tags[l].join(', ') : ""; });
                 document.getElementById('type-astre').value = astre.typeAstre || "smg";
                 document.getElementById('calque-assigne').value = astre.calqueAssigne || "principal";
                 
-                document.getElementById('lco').value = astre.lco || ""; document.getElementById('fwhm').value = astre.fwhm || ""; document.getElementById('mgas').value = astre.mgas || ""; document.getElementById('sfe').value = astre.sfe || "";
-                document.getElementById('ra').value = astre.ra || ""; document.getElementById('dec').value = astre.dec || ""; document.getElementById('redshift').value = astre.redshift || "";
+                document.getElementById('ra').value = astre.ra || ""; 
+                document.getElementById('dec').value = astre.dec || ""; 
+                document.getElementById('redshift').value = astre.redshift || ""; 
+                document.getElementById('snr').value = astre.snr || "";
+                document.getElementById('lco').value = astre.lco || ""; 
+                document.getElementById('fwhm').value = astre.fwhm || ""; 
+                document.getElementById('mgas').value = astre.mgas || ""; 
+                document.getElementById('sfe').value = astre.sfe || "";
                 
                 conteneurChampsPerso.innerHTML = '';
                 if (astre.parametresPersonnalises && astre.parametresPersonnalises.fr) { Object.keys(astre.parametresPersonnalises.fr).forEach(cle => { ajouterChampPersonnalise(cle, astre.parametresPersonnalises.fr[cle], astre.parametresPersonnalises.en[cle], astre.parametresPersonnalises.es[cle]); }); }

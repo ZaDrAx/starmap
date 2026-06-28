@@ -9,10 +9,11 @@ let bounds = [[0,0], [1000,1000]];
 let currentLang = 'fr'; let currentFontSize = 16; const astresCharges = []; let dernierAstreOuvert = null; 
 
 const lexique = {
-    fr: { welcome: "Naviguez et cliquez sur un astre pour l'explorer", legend: "Filtres (Légende)", redshift: "Redshift ($z_{CO}$)", masse: "Masse ($M_{\\odot}$)", masseGaz: "Masse Gaz ($M_{\\odot}$)", sfr: "SFR", nonMesure: "Non mesuré", altPhoto: "Photo de l'astre" },
-    en: { welcome: "Navigate and click on a celestial body to explore it", legend: "Filters (Legend)", redshift: "Redshift ($z_{CO}$)", masse: "Stellar Mass ($M_{\\odot}$)", masseGaz: "Gas Mass ($M_{\\odot}$)", sfr: "SFR", nonMesure: "Not measured", altPhoto: "Photo of celestial body" },
-    es: { welcome: "Navegue y haga clic en un astro para explorarlo", legend: "Filtros (Leyenda)", redshift: "Corrimiento al rojo ($z_{CO}$)", masse: "Masa Estelar ($M_{\\odot}$)", masseGaz: "Masa de Gas ($M_{\\odot}$)", sfr: "SFR", nonMesure: "No medido", altPhoto: "Foto del astro" }
+    fr: { welcome: "Naviguez et cliquez sur un astre pour l'explorer", legend: "Filtres (Légende)", ra: "RA (J2000)", dec: "DEC (J2000)", redshift: "Redshift (z)", snr: "SNR", lco: "$L'_{CO}\\ (10^{10}\\ K\\ km\\ s^{-1}\\ pc^2)$", fwhm: "FWHM$_{CO}\\ (km\\ s^{-1})$", mgas: "$M_{gas}\\ (10^{10}\\ M_{\\odot})$", sfe: "SFE $(yr^{-1})$", altPhoto: "Photo de l'astre" },
+    en: { welcome: "Navigate and click on a celestial body to explore it", legend: "Filters (Legend)", ra: "RA (J2000)", dec: "DEC (J2000)", redshift: "Redshift (z)", snr: "SNR", lco: "$L'_{CO}\\ (10^{10}\\ K\\ km\\ s^{-1}\\ pc^2)$", fwhm: "FWHM$_{CO}\\ (km\\ s^{-1})$", mgas: "$M_{gas}\\ (10^{10}\\ M_{\\odot})$", sfe: "SFE $(yr^{-1})$", altPhoto: "Photo of celestial body" },
+    es: { welcome: "Navegue y haga clic en un astro para explorarlo", legend: "Filtros (Leyenda)", ra: "RA (J2000)", dec: "DEC (J2000)", redshift: "Redshift (z)", snr: "SNR", lco: "$L'_{CO}\\ (10^{10}\\ K\\ km\\ s^{-1}\\ pc^2)$", fwhm: "FWHM$_{CO}\\ (km\\ s^{-1})$", mgas: "$M_{gas}\\ (10^{10}\\ M_{\\odot})$", sfe: "SFE $(yr^{-1})$", altPhoto: "Foto del astro" }
 };
+
 const typesTraduction = {
     smg: { fr: "SMG (Galaxie Submillimétrique)", en: "SMG (Submillimeter Galaxy)", es: "SMG (Galaxia Submilimétrica)" },
     lrd: { fr: "LRD (Petit Point Rouge)", en: "LRD (Little Red Dot)", es: "LRD (Pequeño Punto Rojo)" },
@@ -50,51 +51,45 @@ async function initialiserCartePublique() {
         const overlays = {};
         
         calquesDB.forEach((c, index) => {
-            if (index === 0) {
-                if (c.url) L.imageOverlay(c.url, bounds).addTo(map);
-            } else if (c.url) {
-                const layer = L.imageOverlay(c.url, bounds);
-                calquesLeaflet.push(layer); overlays[c.nom] = layer;
-            } else if (c.nom) {
-                const group = L.featureGroup().addTo(map);
-                groupesFormesPublic[c.nom] = group; overlays[c.nom] = group;
-            }
+            if (index === 0) { if (c.url) L.imageOverlay(c.url, bounds).addTo(map); } 
+            else if (c.url) { const layer = L.imageOverlay(c.url, bounds); calquesLeaflet.push(layer); overlays[c.nom] = layer; } 
+            else if (c.nom) { const group = L.featureGroup().addTo(map); groupesFormesPublic[c.nom] = group; overlays[c.nom] = group; }
         });
-
         if (Object.keys(overlays).length > 0) L.control.layers({}, overlays, { position: 'topright' }).addTo(map);
-        map.fitBounds(bounds); chargerCartePublique(); 
+        
+        // CORRECTIF IFRAME ICI : Délai pour forcer Leaflet à lire la vraie taille de l'écran
+        setTimeout(() => {
+            map.invalidateSize();
+            // On centre parfaitement la caméra au milieu de l'image
+            map.setView([h / 2, w / 2], map.getBoundsZoom(bounds));
+        }, 250);
+
+        chargerCartePublique(); 
     }
 
     if (!calquesDB[0].url) { finaliserChargement(1000, 1000); } 
     else {
         const img = new Image();
-        img.onerror = function() { finaliserChargement(1000, 1000); };
+        img.onerror = function() { console.warn("L'image de fond n'a pas pu être chargée."); finaliserChargement(1000, 1000); };
         img.onload = function() { finaliserChargement(img.naturalHeight || 1000, img.naturalWidth || 1000); }
         img.src = calquesDB[0].url;
     }
 }
 initialiserCartePublique();
 
-// --- GESTION DU PANNEAU LATÉRAL ---
+// Optionnel mais recommandé : Recentrer si l'utilisateur redimensionne la fenêtre (ou tourne son téléphone)
+window.addEventListener('resize', () => {
+    map.invalidateSize();
+});
+
 const panneau = document.getElementById('info-panel'); const btnFermer = document.getElementById('btn-fermer'); const messageAccueil = document.getElementById('message-accueil');
 btnFermer.addEventListener('click', () => { panneau.classList.remove('ouvert'); dernierAstreOuvert = null; });
 map.on('click', () => { panneau.classList.remove('ouvert'); dernierAstreOuvert = null; });
 
-// --- NOUVEAU : GESTION DE LA LIGHTBOX (AGRANDISSEMENT D'IMAGE) ---
-const lightboxModal = document.getElementById('lightbox-modal');
-const lightboxImg = document.getElementById('lightbox-img');
-const lightboxFermer = document.getElementById('lightbox-fermer');
-
-function fermerLightbox() {
-    lightboxModal.classList.remove('ouvert');
-    lightboxModal.setAttribute('aria-hidden', 'true');
-}
-
+const lightboxModal = document.getElementById('lightbox-modal'); const lightboxImg = document.getElementById('lightbox-img'); const lightboxFermer = document.getElementById('lightbox-fermer');
+function fermerLightbox() { lightboxModal.classList.remove('ouvert'); lightboxModal.setAttribute('aria-hidden', 'true'); }
 lightboxFermer.addEventListener('click', fermerLightbox);
-lightboxModal.addEventListener('click', (e) => {
-    // Ferme la lightbox si on clique dans le vide (autour de l'image)
-    if (e.target === lightboxModal) fermerLightbox(); 
-});
+lightboxModal.addEventListener('click', (e) => { if (e.target === lightboxModal) fermerLightbox(); });
 
 let currentSlide = 0; let photosActuelles = [];
 function afficherSlide(index) {
@@ -112,25 +107,11 @@ function construireCarrousel(photos, nomAstre) {
     container.style.display = 'block'; imagesDiv.innerHTML = ''; dotsDiv.innerHTML = ''; currentSlide = 0;
     
     photosActuelles.forEach((url, index) => {
-        const img = document.createElement('img'); 
-        img.src = url; 
-        img.className = `carousel-slide ${index === 0 ? 'active' : ''}`;
+        const img = document.createElement('img'); img.src = url; img.className = `carousel-slide ${index === 0 ? 'active' : ''}`;
         img.alt = `${lexique[currentLang].altPhoto} ${nomAstre} (${index + 1}/${photosActuelles.length})`; 
-        
-        // Clic sur l'image = Ouverture de la Lightbox plein écran
-        img.addEventListener('click', () => {
-            lightboxImg.src = img.src;
-            lightboxImg.alt = img.alt;
-            lightboxModal.classList.add('ouvert');
-            lightboxModal.setAttribute('aria-hidden', 'false');
-        });
-
+        img.addEventListener('click', () => { lightboxImg.src = img.src; lightboxImg.alt = img.alt; lightboxModal.classList.add('ouvert'); lightboxModal.setAttribute('aria-hidden', 'false'); });
         imagesDiv.appendChild(img);
-
-        if (photosActuelles.length > 1) { 
-            const dot = document.createElement('div'); dot.className = `dot ${index === 0 ? 'active' : ''}`; 
-            dot.addEventListener('click', () => afficherSlide(index)); dotsDiv.appendChild(dot); 
-        }
+        if (photosActuelles.length > 1) { const dot = document.createElement('div'); dot.className = `dot ${index === 0 ? 'active' : ''}`; dot.addEventListener('click', () => afficherSlide(index)); dotsDiv.appendChild(dot); }
     });
     document.getElementById('prev-btn').style.display = photosActuelles.length > 1 ? 'block' : 'none'; document.getElementById('next-btn').style.display = photosActuelles.length > 1 ? 'block' : 'none';
 }
@@ -144,10 +125,16 @@ function ouvrirPanneau(donnees) {
     construireCarrousel(donnees.photos, nomTraduit);
 
     const grid = document.getElementById('info-grid'); grid.innerHTML = ''; 
+    
+    if (donnees.ra) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].ra}</span><span class="data-value">${donnees.ra}</span></div>`;
+    if (donnees.dec) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].dec}</span><span class="data-value">${donnees.dec}</span></div>`;
     if (donnees.redshift) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].redshift}</span><span class="data-value">${donnees.redshift}</span></div>`;
-    if (donnees.masse) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].masse}</span><span class="data-value">${donnees.masse}</span></div>`;
-    if (donnees.masseGaz) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].masseGaz}</span><span class="data-value">${donnees.masseGaz}</span></div>`;
-    if (donnees.sfr) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].sfr}</span><span class="data-value">${donnees.sfr}</span></div>`;
+    if (donnees.snr) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].snr}</span><span class="data-value">${donnees.snr}</span></div>`;
+    if (donnees.lco) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].lco}</span><span class="data-value">${donnees.lco}</span></div>`;
+    if (donnees.fwhm) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].fwhm}</span><span class="data-value">${donnees.fwhm}</span></div>`;
+    if (donnees.mgas) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].mgas}</span><span class="data-value">${donnees.mgas}</span></div>`;
+    if (donnees.sfe) grid.innerHTML += `<div class="data-card"><span class="data-label">${lexique[currentLang].sfe}</span><span class="data-value">${donnees.sfe}</span></div>`;
+
     if (donnees.parametresPersonnalises && donnees.parametresPersonnalises[currentLang]) { Object.entries(donnees.parametresPersonnalises[currentLang]).forEach(([cle, valeur]) => { if(valeur) grid.innerHTML += `<div class="data-card"><span class="data-label">${cle}</span><span class="data-value">${valeur}</span></div>`; }); }
 
     const conteneurTags = document.getElementById('info-tags'); conteneurTags.innerHTML = ''; 
@@ -226,5 +213,5 @@ async function chargerCartePublique() {
         
         map.on('overlayadd overlayremove', appliquerFiltresLegende);
         construireLegende();
-    } catch (erreur) { console.error("Erreur critique BDD :", erreur); }
+    } catch (erreur) { console.error("Erreur critique BDD :", erreur); alert("🚨 Erreur de chargement des objets astronomiques :\n" + erreur.message); }
 }
